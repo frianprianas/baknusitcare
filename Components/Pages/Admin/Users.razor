@@ -1,0 +1,182 @@
+@page "/admin/users"
+@using BaknusITCare.Data
+@inject IMailcowAuthService MailcowAuth
+@inject ApplicationDbContext DbContext
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+
+<PageTitle>Mailcow Sync Hub - BaknusITCare</PageTitle>
+
+@if (!UserSession.IsAdmin)
+{
+    <div class="fluent-card text-center p-5 mx-auto" style="max-width: 500px;">
+        <i class="bi bi-shield-lock-fill fs-1 text-danger"></i>
+        <h4 class="fw-bold mt-3 text-danger">Akses Ditolak</h4>
+        <p class="text-secondary">Halaman ini hanya dapat diakses oleh Administrator IT Sekolah.</p>
+        <a href="" class="btn btn-primary rounded-pill">Kembali ke Dashboard</a>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-repeat text-primary me-2"></i>Mailcow User Sync Hub</h3>
+            <p class="text-secondary small mb-0">Sinkronisasi akun & penetapan peran (Admin, Teknisi, Pelapor) langsung dari Mailcow API Server</p>
+        </div>
+        <div>
+            <button class="btn btn-primary fw-bold rounded-pill px-4 shadow-sm" @onclick="TriggerMailcowSync" disabled="@IsSyncing">
+                @if (IsSyncing)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>Menghubungi Mailcow API...</span>
+                }
+                else
+                {
+                    <i class="bi bi-cloud-download-fill me-2"></i>
+                    <span>Sinkronkan Sekarang</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(SyncResultMessage))
+    {
+        <div class="alert alert-success d-flex align-items-center rounded-3 mb-4 shadow-sm">
+            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+            <div>@SyncResultMessage</div>
+        </div>
+    }
+
+    <!-- Mailcow Status Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="fluent-card p-3 text-center border-start border-4 border-primary">
+                <small class="text-muted text-uppercase fw-bold">Total Pengguna</small>
+                <div class="display-6 fw-bold text-dark mt-1">@UsersList.Count</div>
+                <small class="text-secondary"><i class="bi bi-people me-1"></i>Mailcow Database</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="fluent-card p-3 text-center border-start border-4 border-danger">
+                <small class="text-muted text-uppercase fw-bold">Admin IT</small>
+                <div class="display-6 fw-bold text-danger mt-1">@UsersList.Count(u => u.RoleName == "Admin")</div>
+                <small class="text-danger"><i class="bi bi-shield-check me-1"></i>Pengelola Utama</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="fluent-card p-3 text-center border-start border-4 border-warning">
+                <small class="text-muted text-uppercase fw-bold">Teknisi IT</small>
+                <div class="display-6 fw-bold text-warning mt-1">@UsersList.Count(u => u.RoleName == "Teknisi")</div>
+                <small class="text-warning"><i class="bi bi-tools me-1"></i>Petugas Resolver</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="fluent-card p-3 text-center border-start border-4 border-success">
+                <small class="text-muted text-uppercase fw-bold">Pelapor / User</small>
+                <div class="display-6 fw-bold text-success mt-1">@UsersList.Count(u => u.RoleName == "Pelapor")</div>
+                <small class="text-success"><i class="bi bi-person me-1"></i>Guru, TU, Siswa</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="fluent-card p-0 overflow-hidden">
+        <div class="p-3 bg-light border-bottom d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-person-lines-fill me-2"></i>Daftar Pengguna Terdaftar</h6>
+            <span class="badge bg-secondary">Mailcow Domain: smk.baktinusantara666.sch.id</span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light text-muted small text-uppercase">
+                    <tr>
+                        <th class="ps-4">Nama Lengkap</th>
+                        <th>Email Mailcow</th>
+                        <th>Peran (Role)</th>
+                        <th>Tag / Departemen</th>
+                        <th>Login Terakhir</th>
+                        <th class="pe-4 text-end">Ubah Peran</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in UsersList)
+                    {
+                        <tr>
+                            <td class="ps-4">
+                                <div class="fw-bold text-dark">@user.FullName</div>
+                                <div class="small text-muted">ID: @user.Id.Substring(0, 8)...</div>
+                            </td>
+                            <td>
+                                <span class="fw-semibold text-primary">@user.Email</span>
+                            </td>
+                            <td>
+                                @if (user.RoleName == "Admin")
+                                {
+                                    <span class="badge bg-danger text-white"><i class="bi bi-shield-fill me-1"></i>Admin</span>
+                                }
+                                else if (user.RoleName == "Teknisi")
+                                {
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i>Teknisi IT</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border"><i class="bi bi-person me-1"></i>Pelapor</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge bg-info text-dark">@(string.IsNullOrEmpty(user.DepartmentOrClass) ? "Guru, TU" : user.DepartmentOrClass)</span>
+                            </td>
+                            <td>
+                                <span class="small text-muted">@(user.LastLoginAt?.ToString("dd MMM HH:mm") ?? "Belum Pernah")</span>
+                            </td>
+                            <td class="pe-4 text-end">
+                                <select class="form-select form-select-sm d-inline-block w-auto" @onchange="(e) => UpdateUserRole(user, e.Value?.ToString())">
+                                    <option value="Pelapor" selected="@(user.RoleName == "Pelapor")">Pelapor</option>
+                                    <option value="Teknisi" selected="@(user.RoleName == "Teknisi")">Teknisi IT</option>
+                                    <option value="Admin" selected="@(user.RoleName == "Admin")">Admin</option>
+                                </select>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ApplicationUser> UsersList = new();
+    private bool IsSyncing = false;
+    private string? SyncResultMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        UsersList = await DbContext.Users.OrderBy(u => u.RoleName).ThenBy(u => u.FullName).ToListAsync();
+    }
+
+    private async Task TriggerMailcowSync()
+    {
+        IsSyncing = true;
+        SyncResultMessage = null;
+
+        var res = await MailcowAuth.SyncMailcowUsersAsync();
+        
+        IsSyncing = false;
+        SyncResultMessage = res.Message;
+
+        await LoadUsers();
+    }
+
+    private async Task UpdateUserRole(ApplicationUser user, string? newRole)
+    {
+        if (string.IsNullOrEmpty(newRole)) return;
+        user.RoleName = newRole;
+        await DbContext.SaveChangesAsync();
+        await LoadUsers();
+    }
+}

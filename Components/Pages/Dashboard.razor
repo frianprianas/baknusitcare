@@ -1,0 +1,263 @@
+@page "/"
+@inject ITicketService TicketService
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Dashboard - BaknusITCare</PageTitle>
+
+<div class="mb-4">
+    <!-- Welcome Banner -->
+    <div class="fluent-card bg-primary text-white p-4 rounded-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #0078d4 0%, #004578 100%);">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-white text-primary fw-bold px-3 py-1 rounded-pill">Sistem Integrated IT Care</span>
+                    <span class="text-white-50 small"><i class="bi bi-clock me-1"></i>@DateTime.Now.ToString("dd MMMM yyyy")</span>
+                </div>
+                <h2 class="fw-bold mb-1">
+                    Selamat Datang, @(UserSession.IsLoggedIn ? UserSession.CurrentUser?.FullName : "Pengguna Guest")!
+                </h2>
+                <p class="mb-0 text-white-50">
+                    Layanan terpadu pelaporan & penanganan masalah IT (Komputer, Wi-Fi, Printer, Proyektor, SIAKAD) di SMK Bakti Nusantara 666.
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a href="tickets/create" class="btn btn-warning text-dark fw-bold px-4 py-2 rounded-pill shadow-sm">
+                    <i class="bi bi-plus-lg me-2"></i> Laporkan Masalah IT
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3">
+                <div class="text-muted small text-uppercase font-weight-bold">Total Tiket</div>
+                <div class="display-6 fw-bold text-dark mt-1">@Stats.TotalTickets</div>
+                <div class="small text-secondary mt-1"><i class="bi bi-archive me-1"></i>Keseluruhan</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3 border-start border-4 border-info">
+                <div class="text-muted small text-uppercase font-weight-bold">Tiket Baru</div>
+                <div class="display-6 fw-bold text-primary mt-1">@Stats.NewTickets</div>
+                <div class="small text-primary mt-1"><i class="bi bi-exclamation-circle me-1"></i>Menunggu Staff</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3 border-start border-4 border-warning">
+                <div class="text-muted small text-uppercase font-weight-bold">Dalam Proses</div>
+                <div class="display-6 fw-bold text-warning mt-1">@Stats.InProgressTickets</div>
+                <div class="small text-warning mt-1"><i class="bi bi-gear-wide-connected me-1"></i>Sedang Ditangani</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3 border-start border-4 border-purple">
+                <div class="text-muted small text-uppercase font-weight-bold">Pending Parts</div>
+                <div class="display-6 fw-bold text-purple mt-1">@Stats.PendingPartsTickets</div>
+                <div class="small text-muted mt-1"><i class="bi bi-hourglass-split me-1"></i>Vendor/Alat</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3 border-start border-4 border-success">
+                <div class="text-muted small text-uppercase font-weight-bold">Selesai</div>
+                <div class="display-6 fw-bold text-success mt-1">@Stats.ResolvedTickets</div>
+                <div class="small text-success mt-1"><i class="bi bi-check2-all me-1"></i>Resolved</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="fluent-card fluent-card-hover text-center p-3 border-start border-4 border-danger">
+                <div class="text-muted small text-uppercase font-weight-bold">SLA Overdue</div>
+                <div class="display-6 fw-bold text-danger mt-1">@Stats.OverdueSlaTickets</div>
+                <div class="small text-danger mt-1"><i class="bi bi-alarm me-1"></i>Perlu Perhatian</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Recent Tickets Table -->
+        <div class="col-12 col-lg-8">
+            <div class="fluent-card p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history text-primary me-2"></i>Tiket IT Terkini</h5>
+                    <a href="tickets" class="btn btn-sm btn-outline-primary rounded-pill">Lihat Semua Tiket <i class="bi bi-arrow-right ms-1"></i></a>
+                </div>
+
+                @if (IsLoading)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Memuat data tiket...</p>
+                    </div>
+                }
+                else if (!RecentTickets.Any())
+                {
+                    <div class="text-center py-5 bg-light rounded-3">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <p class="text-muted mt-2">Belum ada tiket laporan yang terdaftar.</p>
+                        <a href="tickets/create" class="btn btn-sm btn-primary rounded-pill">Buat Laporan Tiket Baru</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th>Kode</th>
+                                    <th>Judul & Lokasi</th>
+                                    <th>Kategori</th>
+                                    <th>Status</th>
+                                    <th>SLA / Batas</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in RecentTickets)
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-dark font-monospace">#@ticket.TicketCode</span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark text-truncate" style="max-width: 220px;">@ticket.Title</div>
+                                            <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>@ticket.Location</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">@ticket.Category?.Name</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge-status status-@ticket.Status.ToString().ToLower()">
+                                                @ticket.Status
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (ticket.IsOverdue)
+                                            {
+                                                <span class="badge bg-danger text-white sla-overdue"><i class="bi bi-exclamation-triangle me-1"></i>OVERDUE</span>
+                                            }
+                                            else if (ticket.Status == TicketStatus.Selesai || ticket.Status == TicketStatus.Ditutup)
+                                            {
+                                                <span class="badge bg-light text-success"><i class="bi bi-check-circle me-1"></i>Selesai</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="small text-secondary"><i class="bi bi-clock me-1"></i>@ticket.TimeRemaining.Hours j @ticket.TimeRemaining.Minutes m</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a href="tickets/detail/@ticket.Id" class="btn btn-sm btn-light rounded-circle shadow-sm" title="Detail Tiket">
+                                                <i class="bi bi-chevron-right"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right Side Widgets -->
+        <div class="col-12 col-lg-4">
+            <!-- Category Distribution Widget -->
+            <div class="fluent-card p-4 mb-4">
+                <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-pie-chart text-primary me-2"></i>Distribusi Kategori Kendala</h5>
+                @if (Stats.CategoryBreakdown.Any())
+                {
+                    <div class="d-flex flex-column gap-2">
+                        @foreach (var cat in Stats.CategoryBreakdown)
+                        {
+                            double percentage = Stats.TotalTickets > 0 ? (double)cat.Value / Stats.TotalTickets * 100 : 0;
+                            <div>
+                                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                                    <span>@cat.Key</span>
+                                    <span class="text-primary">@cat.Value Tiket (@percentage.ToString("F0")%)</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: @percentage%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted small">Belum ada data kategori.</p>
+                }
+            </div>
+
+            <!-- Fast Assistance Knowledge Base Widget -->
+            <div class="fluent-card p-4 bg-white border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="p-3 bg-success bg-opacity-10 text-success rounded-3 fs-3">
+                        <i class="bi bi-lightbulb-fill"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Solusi Cepat Mandiri</h6>
+                        <small class="text-muted">Pusat Bantuan & Panduan IT</small>
+                    </div>
+                </div>
+                <p class="small text-secondary mb-3">
+                    Coba langkah penanganan mandiri untuk kendala Wi-Fi, printer jam, dan reset password sebelum membuat tiket.
+                </p>
+                <a href="knowledge" class="btn btn-outline-success btn-sm w-100 rounded-pill fw-semibold">
+                    <i class="bi bi-book me-1"></i> Buka Pusat Bantuan Knowledge Base
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DashboardStats Stats = new();
+    private List<Ticket> RecentTickets = new();
+    private bool IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnSessionChanged += RefreshData;
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            IsLoading = true;
+            string? userId = UserSession.CurrentUser?.Id;
+            bool isTechOrAdmin = UserSession.IsTechnicianOrAdmin;
+
+            Stats = await TicketService.GetDashboardStatsAsync(userId, isTechOrAdmin) ?? new DashboardStats();
+            var allTickets = await TicketService.GetTicketsAsync(null, null, null, userId, isTechOrAdmin) ?? new List<Ticket>();
+            RecentTickets = allTickets.Take(5).ToList();
+        }
+        catch
+        {
+            Stats = new DashboardStats();
+            RecentTickets = new List<Ticket>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async void RefreshData()
+    {
+        try
+        {
+            await LoadDashboardData();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnSessionChanged -= RefreshData;
+    }
+}

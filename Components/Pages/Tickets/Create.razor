@@ -1,0 +1,222 @@
+@page "/tickets/create"
+@inject ITicketService TicketService
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+
+<PageTitle>Buat Tiket Masalah IT - BaknusITCare</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+        <div class="fluent-card p-4 p-md-5 bg-white mb-4">
+            <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-circle fs-3">
+                    <i class="bi bi-headset"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold text-dark mb-1">Form Pengajuan Kendala IT</h3>
+                    <p class="text-secondary small mb-0">Isi detail laporan untuk penanganan cepat oleh Tim Teknisi IT SMK Bakti Nusantara 666</p>
+                </div>
+            </div>
+
+            <div class="alert alert-info d-flex align-items-center rounded-3 mb-4">
+                <i class="bi bi-info-circle-fill fs-4 me-3 text-info"></i>
+                <div class="small">
+                    <strong>Auto-Responder Mailcow:</strong> Konfirmasi penerimaan laporan tiket beserta nomor tiket akan langsung dikirimkan ke email Mailcow Anda (<strong>@(UserSession.IsLoggedIn ? UserSession.CurrentUser?.Email : "email@smk.baktinusantara666.sch.id")</strong>).
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger rounded-3 mb-4">
+                    <i class="bi bi-exclamation-triangle me-2"></i>@ErrorMessage
+                </div>
+            }
+
+            <EditForm Model="NewTicket" OnValidSubmit="HandleSubmitTicket">
+                <DataAnnotationsValidator />
+
+                <!-- Category Cards -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark mb-2">1. Pilih Kategori Kendala IT <span class="text-danger">*</span></label>
+                    <div class="row g-3">
+                        @foreach (var cat in Categories)
+                        {
+                            bool isSelected = NewTicket.CategoryId == cat.Id;
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="category-tile @(isSelected ? "selected" : "")" @onclick="() => SelectCategory(cat.Id)">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <i class="bi bi-@GetCategoryIcon(cat.Icon) fs-4 text-primary"></i>
+                                        <h6 class="fw-bold mb-0 text-dark">@cat.Name</h6>
+                                    </div>
+                                    <p class="small text-muted mb-2 text-truncate" style="font-size: 0.8rem;">@cat.Description</p>
+                                    <span class="badge bg-light text-primary border" style="font-size: 0.7rem;">
+                                        <i class="bi bi-clock me-1"></i>SLA: ~@cat.DefaultSlaHours Jam
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Ticket Title -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark">2. Judul Singkat Kendala <span class="text-danger">*</span></label>
+                    <InputText @bind-Value="NewTicket.Title" class="form-control form-control-lg bg-light" placeholder="contoh: PC Lab 2 No. 12 Mati Total / Sinyal Wi-Fi Lemah di Ruang Guru" />
+                    <ValidationMessage For="() => NewTicket.Title" class="text-danger small" />
+                </div>
+
+                <!-- Location & Asset Tag -->
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-bold text-dark">3. Lokasi / Ruangan <span class="text-danger">*</span></label>
+                        <select class="form-select bg-light" @bind="NewTicket.Location">
+                            <option value="">-- Pilih Lokasi Ruangan --</option>
+                            <option value="Lab Komputer 1 (Lantai 1)">Lab Komputer 1 (Lantai 1)</option>
+                            <option value="Lab Komputer 2 (Lantai 2)">Lab Komputer 2 (Lantai 2)</option>
+                            <option value="Lab Komputer 3 (Lantai 2)">Lab Komputer 3 (Lantai 2)</option>
+                            <option value="Lab Komputer 4 (Lantai 3)">Lab Komputer 4 (Lantai 3)</option>
+                            <option value="Ruang Guru (Lantai 1)">Ruang Guru (Lantai 1)</option>
+                            <option value="Ruang Tata Usaha (TU)">Ruang Tata Usaha (TU)</option>
+                            <option value="Ruang Kepala Sekolah & Rapat">Ruang Kepala Sekolah & Rapat</option>
+                            <option value="Kelas X (Gedung A)">Kelas X (Gedung A)</option>
+                            <option value="Kelas XI (Gedung B)">Kelas XI (Gedung B)</option>
+                            <option value="Kelas XII (Gedung C)">Kelas XII (Gedung C)</option>
+                            <option value="Aula / Lapangan Utama">Aula / Lapangan Utama</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                        <ValidationMessage For="() => NewTicket.Location" class="text-danger small" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-bold text-dark">4. Tag / Nomor Aset Perangkat (Opsional)</label>
+                        <InputText @bind-Value="NewTicket.AssetTag" class="form-control bg-light" placeholder="contoh: PC-LAB2-12 / PRN-TU-01 / PROJ-XII-PPLG1" />
+                        <small class="text-muted">Terdapat stiker kode aset pada fisik perangkat IT.</small>
+                    </div>
+                </div>
+
+                <!-- Priority -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark">5. Tingkat Urgensi Masalah <span class="text-danger">*</span></label>
+                    <div class="d-flex flex-wrap gap-3">
+                        <label class="btn btn-outline-secondary rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Rendah ? "active btn-secondary text-white" : "")">
+                            <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Rendah)" @onchange="() => NewTicket.Priority = TicketPriority.Rendah" />
+                            🟢 Rendah (Bisa Ditunda)
+                        </label>
+                        <label class="btn btn-outline-primary rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Sedang ? "active btn-primary text-white" : "")">
+                            <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Sedang)" @onchange="() => NewTicket.Priority = TicketPriority.Sedang" />
+                            🔵 Sedang (Standar)
+                        </label>
+                        <label class="btn btn-outline-warning rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Tinggi ? "active btn-warning text-dark" : "")">
+                            <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Tinggi)" @onchange="() => NewTicket.Priority = TicketPriority.Tinggi" />
+                            🟠 Tinggi (Mengganggu PBM)
+                        </label>
+                        <label class="btn btn-outline-danger rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Darurat ? "active btn-danger text-white" : "")">
+                            <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Darurat)" @onchange="() => NewTicket.Priority = TicketPriority.Darurat" />
+                            🔴 Darurat (Layanan Mati Total)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark">6. Deskripsi Rinci Kendala <span class="text-danger">*</span></label>
+                    <InputTextArea @bind-Value="NewTicket.Description" rows="4" class="form-control bg-light" placeholder="Jelaskan secara singkat kronologi kendala, pesan error yang muncul, atau indikator lampu alat..." />
+                    <ValidationMessage For="() => NewTicket.Description" class="text-danger small" />
+                </div>
+
+                <!-- Upload Photo Evidence Simulation -->
+                <div class="mb-4 p-3 bg-light rounded-3 border border-dashed">
+                    <label class="form-label fw-bold text-dark mb-1"><i class="bi bi-paperclip me-1"></i> Lampiran Foto / Bukti Kendala (Opsional)</label>
+                    <input type="file" class="form-control" />
+                    <small class="text-muted mt-1 d-block">Format pendukung: JPG, PNG, PDF (Maksimal 5MB).</small>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                    <a href="tickets" class="btn btn-outline-secondary rounded-pill px-4">Batal</a>
+                    <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5 fw-bold shadow-sm" disabled="@IsSubmitting">
+                        @if (IsSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Kirim & Auto-Reply Email...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-send-fill me-2"></i>
+                            <span>Kirim Laporan Tiket</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Ticket NewTicket = new();
+    private List<TicketCategory> Categories = new();
+    private string? ErrorMessage;
+    private bool IsSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Categories = await TicketService.GetCategoriesAsync();
+        if (Categories.Any())
+        {
+            NewTicket.CategoryId = Categories.First().Id;
+        }
+
+        if (UserSession.IsLoggedIn && UserSession.CurrentUser != null)
+        {
+            NewTicket.RequesterId = UserSession.CurrentUser.Id;
+            NewTicket.RequesterName = UserSession.CurrentUser.FullName;
+            NewTicket.RequesterEmail = UserSession.CurrentUser.Email;
+        }
+        else
+        {
+            NewTicket.RequesterId = Guid.NewGuid().ToString();
+            NewTicket.RequesterName = "Tamu / Pengguna Sekolah";
+            NewTicket.RequesterEmail = "admin@smk.baktinusantara666.sch.id";
+        }
+    }
+
+    private void SelectCategory(int categoryId)
+    {
+        NewTicket.CategoryId = categoryId;
+    }
+
+    private async Task HandleSubmitTicket()
+    {
+        if (string.IsNullOrWhiteSpace(NewTicket.Title) || string.IsNullOrWhiteSpace(NewTicket.Description) || string.IsNullOrWhiteSpace(NewTicket.Location))
+        {
+            ErrorMessage = "Mohon lengkapi Judul, Lokasi, dan Deskripsi Kendala.";
+            return;
+        }
+
+        IsSubmitting = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var createdTicket = await TicketService.CreateTicketAsync(NewTicket);
+            Navigation.NavigateTo($"tickets/detail/{createdTicket.Id}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Gagal membuat tiket: {ex.Message}";
+            IsSubmitting = false;
+        }
+    }
+
+    private string GetCategoryIcon(string iconName)
+    {
+        return iconName switch
+        {
+            "Desktop" => "display",
+            "Wifi" => "wifi",
+            "Print" => "printer",
+            "ProjectionScreen" => "projector",
+            "AppGeneric" => "laptop",
+            _ => "wrench"
+        };
+    }
+}

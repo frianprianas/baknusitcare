@@ -1,0 +1,50 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: baknusitcare-db
+    restart: always
+    user: root
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=BaknusSuperPassword123!
+      - MSSQL_SA_PASSWORD=BaknusSuperPassword123!
+      - MSSQL_PID=Developer
+    ports:
+      - "14333:1433"
+    volumes:
+      - mssql_data_itcare:/var/opt/mssql/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'BaknusSuperPassword123!' -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: baknusitcare-web
+    restart: always
+    ports:
+      - "8089:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - UseSqlite=false
+      - ConnectionStrings__DefaultConnection=Server=db,1433;Database=BaknusITCareDb;User Id=sa;Password=BaknusSuperPassword123!;TrustServerCertificate=True;Encrypt=False;
+      - Mailcow__ApiUrl=https://mail.smk.baktinusantara666.sch.id
+      - Mailcow__ApiKey=925B68-0FF6BB-36B760-F6C051-AAF343
+      - Mailcow__SmtpHost=mail.smk.baktinusantara666.sch.id
+      - Mailcow__SmtpPort=587
+      - Mailcow__SmtpUsername=admin@smk.baktinusantara666.sch.id
+      - Mailcow__SmtpPassword=buhun666
+      - Mailcow__SenderName=BaknusITCare - Layanan IT Sekolah
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mssql_data_itcare:
+    driver: local

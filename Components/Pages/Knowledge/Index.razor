@@ -1,0 +1,175 @@
+@page "/knowledge"
+@inject IKnowledgeService KnowledgeService
+
+<PageTitle>Pusat Bantuan Mandiri IT - BaknusITCare</PageTitle>
+
+<div class="fluent-card bg-primary text-white p-4 p-md-5 mb-4 rounded-4" style="background: linear-gradient(135deg, #0078d4 0%, #0b4a7d 100%);">
+    <div class="text-center max-w-700 mx-auto">
+        <span class="badge bg-white text-primary font-weight-bold px-3 py-1 rounded-pill mb-2">Self-Service Portal</span>
+        <h2 class="fw-bold mb-2">Pusat Bantuan Mandiri IT Sekolah</h2>
+        <p class="text-white-50 mb-4">Cari solusi dan langkah penanganan cepat untuk masalah Wi-Fi, printer jam, dan reset password sebelum membuat tiket.</p>
+        
+        <div class="input-group input-group-lg shadow-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-primary"></i></span>
+            <input type="text" class="form-control border-start-0" placeholder="Cari kata kunci (contoh: Wi-Fi, printer, password, proyektor)..." @bind="SearchQuery" @bind:event="oninput" @onkeyup="FilterArticles" />
+        </div>
+    </div>
+</div>
+
+<!-- Category Tabs -->
+<div class="d-flex flex-wrap gap-2 mb-4 justify-content-center">
+    <button class="btn btn-sm rounded-pill px-3 @(SelectedCategory == null ? "btn-primary" : "btn-white border")" @onclick='() => SetCategory(null)'>
+        Semua Artikel (@Articles.Count)
+    </button>
+    <button class="btn btn-sm rounded-pill px-3 @(SelectedCategory == "Jaringan & Wi-Fi" ? "btn-primary" : "btn-white border")" @onclick='() => SetCategory("Jaringan & Wi-Fi")'>
+        <i class="bi bi-wifi me-1"></i> Jaringan & Wi-Fi
+    </button>
+    <button class="btn btn-sm rounded-pill px-3 @(SelectedCategory == "Printer & Scanner" ? "btn-primary" : "btn-white border")" @onclick='() => SetCategory("Printer & Scanner")'>
+        <i class="bi bi-printer me-1"></i> Printer & Scanner
+    </button>
+    <button class="btn btn-sm rounded-pill px-3 @(SelectedCategory == "SIAKAD & Software" ? "btn-primary" : "btn-white border")" @onclick='() => SetCategory("SIAKAD & Software")'>
+        <i class="bi bi-laptop me-1"></i> SIAKAD & Email
+    </button>
+</div>
+
+<!-- Articles Grid -->
+<div class="row g-4">
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Memuat artikel bantuan...</p>
+        </div>
+    }
+    else if (!FilteredArticles.Any())
+    {
+        <div class="col-12 text-center py-5">
+            <i class="bi bi-book-half fs-1 text-muted"></i>
+            <h5 class="fw-bold mt-2">Tidak Ada Panduan Ditemukan</h5>
+            <p class="text-muted small">Coba ubah kata kunci atau buat tiket pengajuan baru.</p>
+            <a href="tickets/create" class="btn btn-primary btn-sm rounded-pill">Buat Tiket Baru</a>
+        </div>
+    }
+    else
+    {
+        @foreach (var article in FilteredArticles)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="fluent-card fluent-card-hover h-100 d-flex flex-column p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="badge bg-light text-primary border"><i class="bi bi-tag me-1"></i>@article.Category</span>
+                        <small class="text-muted"><i class="bi bi-eye me-1"></i>@article.Views pembaca</small>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2">@article.Title</h5>
+                    <p class="small text-secondary mb-4 flex-grow-1">@article.Summary</p>
+
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-auto">
+                        <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="() => OpenArticle(article)">
+                            Baca Panduan Lengkap <i class="bi bi-arrow-right ms-1"></i>
+                        </button>
+                        <button class="btn btn-sm btn-light text-success rounded-pill" @onclick="() => VoteHelpful(article.Id)">
+                            <i class="bi bi-hand-thumbs-up me-1"></i>@article.HelpfulVotes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Article Detail Modal -->
+@if (ActiveArticle != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 shadow border-0">
+                <div class="modal-header border-0 pb-0">
+                    <span class="badge bg-primary me-2">@ActiveArticle.Category</span>
+                    <button type="button" class="btn-close" @onclick="CloseArticle"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <h3 class="fw-bold text-dark mb-3">@ActiveArticle.Title</h3>
+                    <p class="lead text-secondary border-bottom pb-3">@ActiveArticle.Summary</p>
+                    
+                    <div class="article-content bg-light p-4 rounded-3 text-dark" style="white-space: pre-line;">
+                        @ActiveArticle.Content
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-success btn-sm rounded-pill" @onclick="() => VoteHelpful(ActiveArticle.Id)">
+                        <i class="bi bi-hand-thumbs-up me-1"></i> Sangat Membantu (@ActiveArticle.HelpfulVotes)
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill" @onclick="CloseArticle">Tutup Panduan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<KnowledgeArticle> Articles = new();
+    private bool IsLoading = true;
+    private string? SelectedCategory;
+    private string SearchQuery = "";
+    private KnowledgeArticle? ActiveArticle;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadArticles();
+    }
+
+    private async Task LoadArticles()
+    {
+        IsLoading = true;
+        Articles = await KnowledgeService.GetArticlesAsync();
+        IsLoading = false;
+    }
+
+    private IEnumerable<KnowledgeArticle> FilteredArticles
+    {
+        get
+        {
+            var res = Articles.AsEnumerable();
+            if (!string.IsNullOrEmpty(SelectedCategory))
+            {
+                res = res.Where(a => a.Category == SelectedCategory);
+            }
+            if (!string.IsNullOrWhiteSpace(SearchQuery))
+            {
+                string q = SearchQuery.Trim().ToLower();
+                res = res.Where(a => a.Title.ToLower().Contains(q) || a.Summary.ToLower().Contains(q) || a.Content.ToLower().Contains(q));
+            }
+            return res;
+        }
+    }
+
+    private void SetCategory(string? category)
+    {
+        SelectedCategory = category;
+    }
+
+    private void FilterArticles()
+    {
+        StateHasChanged();
+    }
+
+    private async Task OpenArticle(KnowledgeArticle article)
+    {
+        ActiveArticle = await KnowledgeService.GetArticleByIdAsync(article.Id);
+    }
+
+    private void CloseArticle()
+    {
+        ActiveArticle = null;
+    }
+
+    private async Task VoteHelpful(int articleId)
+    {
+        await KnowledgeService.IncrementHelpfulVoteAsync(articleId);
+        await LoadArticles();
+        if (ActiveArticle != null && ActiveArticle.Id == articleId)
+        {
+            ActiveArticle.HelpfulVotes++;
+        }
+    }
+}

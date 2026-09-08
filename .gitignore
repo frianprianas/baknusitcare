@@ -1,0 +1,25 @@
+## .NET Core
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## Visual Studio
+.vs/
+.vscode/
+
+## Database files
+*.db
+*.db-shm
+*.db-wal
+Data/*.db
+
+## Logs
+logs/
+*.log
+
+## OS Files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,420 @@
+@page "/tickets/detail/{Id:int}"
+@using BaknusITCare.Data
+@inject ITicketService TicketService
+@inject ApplicationDbContext DbContext
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Detail Tiket #@(CurrentTicket?.TicketCode ?? "") - BaknusITCare</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Memuat detail tiket...</p>
+    </div>
+}
+@if (CurrentTicket == null && !IsLoading)
+{
+    <div class="fluent-card text-center p-5 mx-auto" style="max-width: 500px;">
+        <i class="bi bi-search fs-1 text-muted"></i>
+        <h4 class="fw-bold mt-3">Tiket Tidak Ditemukan</h4>
+        <p class="text-secondary">Tiket dengan ID @Id tidak ada atau telah dihapus.</p>
+        <a href="tickets" class="btn btn-primary rounded-pill">Kembali ke Daftar Tiket</a>
+    </div>
+}
+else if (CurrentTicket != null)
+{
+    <!-- Ticket Code Header -->
+    <div class="fluent-card bg-white p-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-dark font-monospace fs-6 px-3 py-2">#@CurrentTicket.TicketCode</span>
+                    <span class="badge-status status-@CurrentTicket.Status.ToString().ToLower()">
+                        @CurrentTicket.Status
+                    </span>
+                    <span class="priority-@CurrentTicket.Priority.ToString().ToLower()">
+                        Urgensi: @CurrentTicket.Priority
+                    </span>
+                </div>
+                <h3 class="fw-bold text-dark mb-1">@CurrentTicket.Title</h3>
+                <div class="small text-muted">
+                    <i class="bi bi-clock me-1"></i>Dilaporkan pada: @CurrentTicket.CreatedAt.ToString("dd MMMM yyyy HH:mm")
+                </div>
+            </div>
+
+            <!-- Action Buttons for Admin/Technician -->
+            <div class="d-flex flex-wrap gap-2">
+                @if (UserSession.IsTechnicianOrAdmin)
+                {
+                    <div class="dropdown">
+                        <button class="btn btn-outline-primary btn-sm rounded-pill dropdown-toggle px-3 fw-semibold" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-pencil-square me-1"></i> Ubah Status Tiket
+                        </button>
+                        <ul class="dropdown-menu shadow border-0">
+                            <li><button class="dropdown-item" @onclick='() => ChangeStatus(TicketStatus.Diproses)'><i class="bi bi-gear-wide-connected text-warning me-2"></i>Diproses</button></li>
+                            <li><button class="dropdown-item" @onclick='() => ChangeStatus(TicketStatus.MenungguSparepart)'><i class="bi bi-hourglass-split text-purple me-2"></i>Menunggu Sparepart/Vendor</button></li>
+                            <li><button class="dropdown-item" @onclick='() => ChangeStatus(TicketStatus.Selesai)'><i class="bi bi-check-circle-fill text-success me-2"></i>Selesai (Resolved)</button></li>
+                            <li><button class="dropdown-item" @onclick='() => ChangeStatus(TicketStatus.Ditutup)'><i class="bi bi-archive-fill text-secondary me-2"></i>Ditutup (Closed)</button></li>
+                        </ul>
+                    </div>
+
+                    <button class="btn btn-warning text-dark btn-sm rounded-pill px-3 fw-bold shadow-sm" @onclick="OpenAssignModal">
+                        <i class="bi bi-person-fill-gear me-1"></i> Tugaskan (GURU / TU / Teknisi)
+                    </button>
+                }
+                <a href="tickets" class="btn btn-light btn-sm rounded-pill px-3 border"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Details & Timeline -->
+        <div class="col-12 col-lg-8">
+            <!-- Ticket Description Card -->
+            <div class="fluent-card p-4 mb-4">
+                <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-file-text text-primary me-2"></i>Rincian Laporan Kendala</h5>
+                <p class="text-dark bg-light p-3 rounded-3 border mb-3" style="white-space: pre-line;">@CurrentTicket.Description</p>
+
+                <div class="row g-3 small text-muted border-top pt-3">
+                    <div class="col-6 col-md-3">
+                        <span class="d-block font-weight-bold text-dark">Kategori:</span>
+                        <span class="badge bg-light text-primary border">@CurrentTicket.Category?.Name</span>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="d-block font-weight-bold text-dark">Lokasi Ruangan:</span>
+                        <span class="text-secondary"><i class="bi bi-geo-alt me-1"></i>@CurrentTicket.Location</span>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="d-block font-weight-bold text-dark">Tag / Kode Aset:</span>
+                        <span class="text-secondary font-monospace">@(CurrentTicket.AssetTag ?? "-")</span>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="d-block font-weight-bold text-dark">Batas Waktu SLA:</span>
+                        @if (CurrentTicket.IsOverdue)
+                        {
+                            <span class="badge bg-danger text-white"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary"><i class="bi bi-clock me-1"></i>@CurrentTicket.DueDate.ToString("dd MMM HH:mm")</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rating Feedback Section (If resolved) -->
+            @if (CurrentTicket.Status == TicketStatus.Selesai || CurrentTicket.Status == TicketStatus.Ditutup)
+            {
+                <div class="fluent-card p-4 mb-4 bg-success bg-opacity-10 border-success">
+                    <h5 class="fw-bold text-success mb-2"><i class="bi bi-star-fill me-2"></i>Penilaian & Feedback Kepuasan Layanan</h5>
+                    @if (CurrentTicket.Rating.HasValue)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="text-warning fs-4">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <i class="bi @(i <= CurrentTicket.Rating.Value ? "bi-star-fill" : "bi-star")"></i>
+                                }
+                            </div>
+                            <span class="fw-bold text-dark fs-5">@CurrentTicket.Rating.Value / 5 Bintang</span>
+                        </div>
+                        <p class="text-secondary italic mb-0">"@CurrentTicket.FeedbackComments"</p>
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-3">Bagaimana pengalaman Anda terkait kecepatan & hasil penanganan tiket ini?</p>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                int starIndex = i;
+                                <button class="btn btn-outline-warning rounded-circle p-2 fs-4" @onclick="() => UserRating = starIndex">
+                                    <i class="bi @(starIndex <= UserRating ? "bi-star-fill text-warning" : "bi-star text-muted")"></i>
+                                </button>
+                            }
+                        </div>
+                        <textarea class="form-control mb-2" rows="2" placeholder="Tuliskan ulasan atau masukan untuk perbaikan layanan IT..." @bind="UserFeedback"></textarea>
+                        <button class="btn btn-success btn-sm rounded-pill px-4 fw-bold" @onclick="SubmitRating">
+                            Kirim Ulasan & Rating
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- Activity Timeline & Comments -->
+            <div class="fluent-card p-4">
+                <h5 class="fw-bold mb-4 text-dark"><i class="bi bi-chat-left-text text-primary me-2"></i>Timeline Aktivitas & Catatan Penanganan</h5>
+
+                <div class="mb-4">
+                    @if (!CurrentTicket.Comments.Any())
+                    {
+                        <p class="text-muted small italic text-center py-3">Belum ada komentar atau aktivitas tambahan.</p>
+                    }
+                    else
+                    {
+                        foreach (var comment in CurrentTicket.Comments.OrderBy(c => c.CreatedAt))
+                        {
+                            if (comment.IsInternal && !UserSession.IsTechnicianOrAdmin) continue; // Hide internal notes from non-staff
+
+                            <div class="timeline-item">
+                                <div class="timeline-dot @(comment.IsInternal ? "bg-warning" : "bg-primary")"></div>
+                                <div class="@(comment.IsInternal ? "timeline-internal" : "bg-light p-3 rounded-3 border mb-2")">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <strong class="text-dark">@comment.UserName</strong>
+                                            <span class="badge bg-secondary" style="font-size: 0.65rem;">@comment.UserRole</span>
+                                            @if (comment.IsInternal)
+                                            {
+                                                <span class="badge bg-warning text-dark"><i class="bi bi-lock me-1"></i>Catatan Internal</span>
+                                            }
+                                        </div>
+                                        <span class="small text-muted">@comment.CreatedAt.ToString("dd MMM HH:mm")</span>
+                                    </div>
+                                    <p class="mb-0 text-secondary" style="white-space: pre-line;">@comment.Message</p>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <!-- Add Comment Box -->
+                <div class="pt-3 border-top">
+                    <h6 class="fw-bold mb-2">Tambah Balasan / Catatan Baru:</h6>
+                    <textarea class="form-control mb-2 bg-light" rows="3" placeholder="Tuliskan pesan balasan atau catatan pembaruan penanganan..." @bind="NewCommentMessage"></textarea>
+                    
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        @if (UserSession.IsTechnicianOrAdmin)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkInternal" @bind="IsInternalNote">
+                                <label class="form-check-label small text-warning fw-bold" for="chkInternal">
+                                    <i class="bi bi-eye-slash me-1"></i> Catatan Internal (Hanya terlihat oleh Tim/Staff IT)
+                                </label>
+                            </div>
+                        }
+                        else
+                        {
+                            <div></div>
+                        }
+                        <button class="btn btn-primary rounded-pill px-4 fw-bold btn-sm shadow-sm" @onclick="PostComment" disabled="@IsPostingComment">
+                            @if (IsPostingComment)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Mengirim...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send me-1"></i>
+                                <span>Kirim Balasan</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <div class="col-12 col-lg-4">
+            <!-- Requester Card -->
+            <div class="fluent-card p-4 mb-4">
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-person-badge text-primary me-2"></i>Informasi Pelapor</h6>
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-circle fs-3">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark">@CurrentTicket.RequesterName</div>
+                        <div class="small text-muted">@CurrentTicket.RequesterEmail</div>
+                    </div>
+                </div>
+                <div class="small bg-light p-2 rounded-2 text-muted">
+                    <i class="bi bi-envelope-paper me-1 text-primary"></i> Notifikasi otomatis auto-responder dikirimkan ke email ini.
+                </div>
+            </div>
+
+            <!-- Assigned Follow-up Officer Card -->
+            <div class="fluent-card p-4 mb-4 border-warning">
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-person-gear text-warning me-2"></i>Petugas Tindak Lanjut (Guru/TU/Teknisi)</h6>
+                @if (!string.IsNullOrEmpty(CurrentTicket.AssignedTechnicianName))
+                {
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-circle fs-3">
+                            <i class="bi bi-person-check-fill"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">@CurrentTicket.AssignedTechnicianName</div>
+                            <div class="small text-success"><i class="bi bi-envelope-check me-1"></i>Email Notifikasi Dikirim</div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="small text-muted mb-2">Belum ada petugas Guru/TU/Teknisi yang ditunjuk Admin untuk menindaklanjuti.</p>
+                    @if (UserSession.IsTechnicianOrAdmin)
+                    {
+                        <button class="btn btn-warning text-dark btn-sm w-100 rounded-pill fw-bold shadow-sm" @onclick="OpenAssignModal">
+                            <i class="bi bi-person-plus me-1"></i> Pilih Petugas (GURU / TU)
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Assign Follow-up Officer (Admin Selection for GURU/TU/Teknisi Mailcow Users) -->
+@if (ShowAssignModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 shadow border-0">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-envelope-at-fill text-primary me-2"></i>Penunjukan Petugas Tindak Lanjut (Admin Mailcow Delegate)</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAssignModal"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <div class="alert alert-info d-flex align-items-center rounded-3 mb-3">
+                        <i class="bi bi-info-circle-fill fs-4 me-3 text-info"></i>
+                        <div class="small">
+                            Pilih user Mailcow (berdasarkan Tag <strong>GURU</strong>, <strong>TU / Staff</strong>, atau <strong>Teknisi</strong>). Saat disimpan, sistem akan secara otomatis mengirimkan <strong>email penugasan tindak lanjut</strong> ke alamat email Mailcow orang tersebut.
+                        </div>
+                    </div>
+
+                    <label class="form-label fw-bold">Pilih User Mailcow (Tag GURU / TU / Teknisi):</label>
+                    <select class="form-select form-select-lg bg-light" @bind="SelectedTechnicianId">
+                        <option value="">-- Pilih User Mailcow yang Ditugaskan --</option>
+                        @foreach (var user in MailcowOfficersList)
+                        {
+                            string tagLabel = user.DepartmentOrClass ?? user.RoleName;
+                            <option value="@user.Id">
+                                [@tagLabel] @user.FullName - (@user.Email)
+                            </option>
+                        }
+                    </select>
+
+                    <div class="mt-3 p-3 bg-light rounded-3 border">
+                        <small class="text-muted d-block fw-semibold mb-1">Email Pengirim Auto-Responder Admin:</small>
+                        <code class="text-primary fs-6">admin@smk.baktinusantara666.sch.id</code>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" @onclick="CloseAssignModal">Batal</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" @onclick="SaveAssignment">
+                        <i class="bi bi-send-fill me-2"></i>Tugaskan & Kirim Email Notifikasi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Ticket? CurrentTicket;
+    private bool IsLoading = true;
+    private string NewCommentMessage = "";
+    private bool IsInternalNote = false;
+    private bool IsPostingComment = false;
+
+    private int UserRating = 5;
+    private string UserFeedback = "";
+
+    private bool ShowAssignModal = false;
+    private string SelectedTechnicianId = "";
+    private List<ApplicationUser> MailcowOfficersList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnSessionChanged += RefreshData;
+        await LoadTicketDetail();
+        
+        // Load all Mailcow users (Guru, TU, Teknisi, Admin) available for ticket follow-up assignment
+        MailcowOfficersList = await DbContext.Users
+            .OrderBy(u => u.RoleName)
+            .ThenBy(u => u.FullName)
+            .ToListAsync();
+    }
+
+    private async Task LoadTicketDetail()
+    {
+        IsLoading = true;
+        CurrentTicket = await TicketService.GetTicketByIdAsync(Id);
+        IsLoading = false;
+    }
+
+    private async Task ChangeStatus(TicketStatus status)
+    {
+        if (CurrentTicket == null) return;
+        string userId = UserSession.CurrentUser?.Id ?? "guest";
+        string userName = UserSession.CurrentUser?.FullName ?? "Staff IT";
+        string role = UserSession.CurrentUser?.RoleName ?? "Teknisi";
+
+        await TicketService.UpdateStatusAsync(CurrentTicket.Id, status, userId, userName, role, "Status diperbarui via Dashboard.");
+        await LoadTicketDetail();
+    }
+
+    private async Task PostComment()
+    {
+        if (string.IsNullOrWhiteSpace(NewCommentMessage) || CurrentTicket == null) return;
+
+        IsPostingComment = true;
+        string userId = UserSession.CurrentUser?.Id ?? "guest";
+        string userName = UserSession.CurrentUser?.FullName ?? "Pengguna";
+        string role = UserSession.CurrentUser?.RoleName ?? "Pelapor";
+
+        await TicketService.AddCommentAsync(CurrentTicket.Id, userId, userName, role, NewCommentMessage, IsInternalNote);
+        NewCommentMessage = "";
+        IsInternalNote = false;
+        IsPostingComment = false;
+
+        await LoadTicketDetail();
+    }
+
+    private async Task SubmitRating()
+    {
+        if (CurrentTicket == null) return;
+        await TicketService.SubmitRatingAsync(CurrentTicket.Id, UserRating, UserFeedback);
+        await LoadTicketDetail();
+    }
+
+    private void OpenAssignModal()
+    {
+        ShowAssignModal = true;
+    }
+
+    private void CloseAssignModal()
+    {
+        ShowAssignModal = false;
+    }
+
+    private async Task SaveAssignment()
+    {
+        if (string.IsNullOrEmpty(SelectedTechnicianId) || CurrentTicket == null) return;
+        var officer = MailcowOfficersList.FirstOrDefault(t => t.Id == SelectedTechnicianId);
+        if (officer != null)
+        {
+            string assignedBy = UserSession.CurrentUser?.Id ?? "admin";
+            await TicketService.AssignTechnicianAsync(CurrentTicket.Id, officer.Id, officer.FullName, assignedBy);
+            ShowAssignModal = false;
+            await LoadTicketDetail();
+        }
+    }
+
+    private async void RefreshData()
+    {
+        try
+        {
+            await LoadTicketDetail();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnSessionChanged -= RefreshData;
+    }
+}

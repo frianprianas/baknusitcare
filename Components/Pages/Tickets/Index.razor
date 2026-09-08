@@ -1,0 +1,264 @@
+@page "/tickets"
+@inject ITicketService TicketService
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Daftar Tiket IT - BaknusITCare</PageTitle>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-ticket-perforated text-primary me-2"></i>Daftar Tiket Layanan IT</h3>
+        <p class="text-secondary small mb-0">Manajemen & pelacakan status penanganan kendala IT sekolah</p>
+    </div>
+    <div>
+        <a href="tickets/create" class="btn btn-primary fw-bold rounded-pill px-4 shadow-sm">
+            <i class="bi bi-plus-circle-fill me-2"></i>Buat Tiket Baru
+        </a>
+    </div>
+</div>
+
+<!-- Filters & Search Toolbar -->
+<div class="fluent-card p-3 mb-4">
+    <div class="row g-3 align-items-center">
+        <!-- Search Input -->
+        <div class="col-12 col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control bg-light border-start-0" placeholder="Cari Kode Tiket, Judul, Pelapor, Lokasi, Tag Aset..." @bind="SearchQuery" @bind:event="oninput" @onkeyup="HandleSearch" />
+            </div>
+        </div>
+
+        <!-- Category Dropdown -->
+        <div class="col-12 col-md-4">
+            <select class="form-select bg-light" @bind="SelectedCategory" @bind:after="ApplyFilter">
+                <option value="">-- Semua Kategori Kendala --</option>
+                @foreach (var cat in Categories)
+                {
+                    <option value="@cat.Id">@cat.Name</option>
+                }
+            </select>
+        </div>
+
+        <!-- Status Filter Tabs -->
+        <div class="col-12 col-md-3 text-md-end">
+            <button class="btn btn-outline-secondary btn-sm rounded-pill w-100" @onclick="ResetFilter">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filter
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Tabs -->
+    <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top">
+        <button class="btn btn-sm rounded-pill px-3 @(SelectedStatus == null ? "btn-primary" : "btn-light")" @onclick='() => SetStatusTab(null)'>
+            Semua Tiket (@Tickets.Count)
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 @(SelectedStatus == "Baru" ? "btn-info text-white" : "btn-light")" @onclick='() => SetStatusTab("Baru")'>
+            Baru
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 @(SelectedStatus == "Diproses" ? "btn-warning text-dark" : "btn-light")" @onclick='() => SetStatusTab("Diproses")'>
+            Diproses
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 @(SelectedStatus == "MenungguSparepart" ? "btn-purple text-white" : "btn-light")" @onclick='() => SetStatusTab("MenungguSparepart")'>
+            Menunggu Sparepart
+        </button>
+        <button class="btn btn-sm rounded-pill px-3 @(SelectedStatus == "Selesai" ? "btn-success" : "btn-light")" @onclick='() => SetStatusTab("Selesai")'>
+            Selesai
+        </button>
+    </div>
+</div>
+
+<!-- Ticket Table -->
+<div class="fluent-card p-0 overflow-hidden">
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Memuat data tiket...</p>
+        </div>
+    }
+    else if (!FilteredTickets.Any())
+    {
+        <div class="text-center py-5 bg-white">
+            <i class="bi bi-folder-x fs-1 text-muted"></i>
+            <h5 class="fw-bold mt-2">Tidak Ada Tiket Ditemukan</h5>
+            <p class="text-muted small">Coba ubah kata kunci pencarian atau filter status Anda.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light text-muted small text-uppercase">
+                    <tr>
+                        <th class="ps-4">Kode Tiket</th>
+                        <th>Judul & Pelapor</th>
+                        <th>Kategori & Lokasi</th>
+                        <th>Urgensi</th>
+                        <th>Status</th>
+                        <th>Teknisi IT</th>
+                        <th>Batas SLA</th>
+                        <th class="pe-4 text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ticket in FilteredTickets)
+                    {
+                        <tr>
+                            <td class="ps-4">
+                                <span class="badge bg-dark font-monospace">#@ticket.TicketCode</span>
+                                <div class="small text-muted">@ticket.CreatedAt.ToString("dd MMM HH:mm")</div>
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">@ticket.Title</div>
+                                <div class="small text-muted"><i class="bi bi-person me-1"></i>@ticket.RequesterName</div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold text-primary">@ticket.Category?.Name</div>
+                                <div class="small text-secondary"><i class="bi bi-geo-alt me-1"></i>@ticket.Location @(string.IsNullOrEmpty(ticket.AssetTag) ? "" : $"[{ticket.AssetTag}]")</div>
+                            </td>
+                            <td>
+                                <span class="priority-@ticket.Priority.ToString().ToLower()">
+                                    @ticket.Priority
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-status status-@ticket.Status.ToString().ToLower()">
+                                    @ticket.Status
+                                </span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(ticket.AssignedTechnicianName))
+                                {
+                                    <span class="badge bg-light text-dark border"><i class="bi bi-tools me-1 text-warning"></i>@ticket.AssignedTechnicianName</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-muted"><i class="bi bi-dash"></i> Belum Ditugaskan</span>
+                                }
+                            </td>
+                            <td>
+                                @if (ticket.IsOverdue)
+                                {
+                                    <span class="badge bg-danger text-white sla-overdue"><i class="bi bi-exclamation-triangle me-1"></i>OVERDUE</span>
+                                }
+                                else if (ticket.Status == TicketStatus.Selesai || ticket.Status == TicketStatus.Ditutup)
+                                {
+                                    <span class="badge bg-light text-success"><i class="bi bi-check-all me-1"></i>Selesai</span>
+                                }
+                                else
+                                {
+                                    <span class="small text-muted"><i class="bi bi-clock me-1"></i>@ticket.TimeRemaining.Hours j @ticket.TimeRemaining.Minutes m</span>
+                                }
+                            </td>
+                            <td class="pe-4 text-end">
+                                <a href="tickets/detail/@ticket.Id" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm">
+                                    Detail <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Ticket> Tickets = new();
+    private List<TicketCategory> Categories = new();
+    private bool IsLoading = true;
+
+    private string? SelectedStatus;
+    private string SelectedCategory = "";
+    private string SearchQuery = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnSessionChanged += RefreshData;
+        Categories = await TicketService.GetCategoriesAsync();
+        await LoadTickets();
+    }
+
+    private async Task LoadTickets()
+    {
+        IsLoading = true;
+        string? userId = UserSession.CurrentUser?.Id;
+        bool isTechOrAdmin = UserSession.IsTechnicianOrAdmin;
+
+        Tickets = await TicketService.GetTicketsAsync(null, null, null, userId, isTechOrAdmin);
+        IsLoading = false;
+    }
+
+    private IEnumerable<Ticket> FilteredTickets
+    {
+        get
+        {
+            var res = Tickets.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(SelectedStatus))
+            {
+                if (Enum.TryParse<TicketStatus>(SelectedStatus, out var st))
+                {
+                    res = res.Where(t => t.Status == st);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(SelectedCategory) && int.TryParse(SelectedCategory, out var catId))
+            {
+                res = res.Where(t => t.CategoryId == catId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(SearchQuery))
+            {
+                string q = SearchQuery.Trim().ToLower();
+                res = res.Where(t => 
+                    t.TicketCode.ToLower().Contains(q) ||
+                    t.Title.ToLower().Contains(q) ||
+                    t.Location.ToLower().Contains(q) ||
+                    t.RequesterName.ToLower().Contains(q) ||
+                    (t.AssetTag != null && t.AssetTag.ToLower().Contains(q))
+                );
+            }
+
+            return res;
+        }
+    }
+
+    private void SetStatusTab(string? status)
+    {
+        SelectedStatus = status;
+    }
+
+    private void ApplyFilter()
+    {
+        StateHasChanged();
+    }
+
+    private void HandleSearch()
+    {
+        StateHasChanged();
+    }
+
+    private void ResetFilter()
+    {
+        SelectedStatus = null;
+        SelectedCategory = "";
+        SearchQuery = "";
+    }
+
+    private async void RefreshData()
+    {
+        try
+        {
+            await LoadTickets();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnSessionChanged -= RefreshData;
+    }
+}

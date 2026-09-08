@@ -1,0 +1,152 @@
+/* Microsoft Fluent UI Signature Theme for BaknusITCare */
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --ms-blue: #0078d4;
+    --ms-blue-hover: #106ebe;
+    --ms-blue-light: #eff6fc;
+    --ms-bg-canvas: #f3f2f1;
+    --ms-bg-card: #ffffff;
+    --ms-text-primary: #201f1e;
+    --ms-text-secondary: #605e5c;
+    --ms-border: #e1dfdd;
+    --ms-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    --ms-header-gradient: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+    --ms-radius: 8px;
+    --ms-radius-lg: 12px;
+}
+
+body {
+    font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background-color: var(--ms-bg-canvas);
+    color: var(--ms-text-primary);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Glassmorphism Header */
+.fluent-header {
+    background: var(--ms-header-gradient);
+    color: white;
+    padding: 12px 28px;
+    box-shadow: 0 4px 20px rgba(0, 120, 212, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.fluent-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    font-size: 1.25rem;
+    letter-spacing: -0.3px;
+}
+
+.fluent-brand-badge {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Card Elevation */
+.fluent-card {
+    background: var(--ms-bg-card);
+    border: 1px solid var(--ms-border);
+    border-radius: var(--ms-radius-lg);
+    box-shadow: var(--ms-card-shadow);
+    padding: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fluent-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Status Badges */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.status-baru { background-color: #e5f3ff; color: #0078d4; border: 1px solid #71afe5; }
+.status-diproses { background-color: #fff4ce; color: #797700; border: 1px solid #ffe37d; }
+.status-menunggusparepart { background-color: #f3e5f5; color: #7b1fa2; border: 1px solid #ce93d8; }
+.status-selesai { background-color: #dff6dd; color: #107c41; border: 1px solid #92c353; }
+.status-ditutup { background-color: #f3f2f1; color: #605e5c; border: 1px solid #c8c6c4; }
+
+/* Priority Badges */
+.priority-darurat { color: #d13438; font-weight: 700; background: #fde7e9; padding: 2px 8px; border-radius: 4px; }
+.priority-tinggi { color: #ffaa00; font-weight: 600; background: #fff8e5; padding: 2px 8px; border-radius: 4px; }
+.priority-sedang { color: #0078d4; font-weight: 500; background: #eff6fc; padding: 2px 8px; border-radius: 4px; }
+.priority-rendah { color: #605e5c; font-weight: 400; background: #f3f2f1; padding: 2px 8px; border-radius: 4px; }
+
+/* SLA Counter Pulse */
+.sla-overdue {
+    color: #d13438;
+    animation: pulse 1.8s infinite;
+    font-weight: 600;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Category Grid Tiles */
+.category-tile {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: var(--ms-radius);
+    padding: 16px;
+    background: #ffffff;
+    transition: all 0.2s ease;
+}
+
+.category-tile.selected, .category-tile:hover {
+    border-color: var(--ms-blue);
+    background: var(--ms-blue-light);
+}
+
+/* Timeline Activity */
+.timeline-item {
+    position: relative;
+    padding-left: 28px;
+    padding-bottom: 20px;
+    border-left: 2px solid var(--ms-border);
+}
+
+.timeline-item:last-child {
+    border-left: 2px solid transparent;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -7px;
+    top: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ms-blue);
+}
+
+.timeline-internal {
+    background-color: #fff9e6;
+    border-left: 3px solid #ffaa00;
+    padding: 10px;
+    border-radius: 4px;
+}
