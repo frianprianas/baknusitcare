@@ -5,6 +5,7 @@
 @inject ApplicationDbContext DbContext
 @inject UserSessionService UserSession
 @inject NavigationManager Navigation
+@inject BaknusITCare.Services.IEmailService EmailService
 
 <PageTitle>Kelola Tim IT & Pengguna Mailcow - BaknusITCare</PageTitle>
 
@@ -98,6 +99,79 @@ else
                 <small class="text-danger fw-semibold"><i class="bi bi-shield-check me-1"></i>Administrator</small>
             </div>
         </div>
+    </div>
+
+    <!-- Email Delivery Diagnostics & Direct Test Tool -->
+    <div class="fluent-card p-4 bg-white mb-4 border-0 shadow-sm border-start border-4 border-primary">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary bg-opacity-10 text-primary p-2 rounded-circle">
+                        <i class="bi bi-envelope-check-fill fs-5"></i>
+                    </span>
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">Uji Coba Pengiriman Email ke Petugas IT</h5>
+                        <small class="text-secondary">Verifikasi langsung pengiriman email dari server Mailcow (admin@smk.baktinusantara666.sch.id)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
+                    <i class="bi bi-shield-lock-fill me-1"></i> Mode SMTP Terverifikasi
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 rounded-3 bg-light border mb-3">
+            <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-7">
+                    <label class="form-label small fw-bold text-muted mb-1">Kirim Email Test Diagnostik Ke:</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-person-badge text-primary"></i></span>
+                        <input type="email" class="form-control" placeholder="frian_p@smk.baktinusantara666.sch.id" @bind="TestRecipientEmail" />
+                    </div>
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>Sistem otomatis mendaftarkan <strong>frian_p@smk.baktinusantara666.sch.id</strong> dan <strong>admin@smk.baktinusantara666.sch.id</strong> sebagai penerima utama setiap ada tiket masuk/update status.
+                    </small>
+                </div>
+                <div class="col-12 col-md-5 d-flex align-items-end">
+                    <button class="btn btn-primary fw-bold w-100 py-2 rounded-pill shadow-sm" @onclick="ExecuteEmailTest" disabled="@IsTestingEmail">
+                        @if (IsTestingEmail)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Menghubungi SMTP Server...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-send-fill me-2"></i>
+                            <span>Kirim Email Uji Coba Sekarang</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (EmailTestSuccess.HasValue)
+        {
+            <div class="alert @(EmailTestSuccess.Value ? "alert-success border-success" : "alert-danger border-danger") rounded-3 shadow-sm mb-0">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi @(EmailTestSuccess.Value ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-4 me-2"></i>
+                    <h6 class="fw-bold mb-0 @(EmailTestSuccess.Value ? "text-success" : "text-danger")">
+                        @(EmailTestSuccess.Value ? "Email Berhasil Terkirim ke Penerima!" : "Pengiriman Email Gagal!")
+                    </h6>
+                </div>
+                <div class="small mb-2">
+                    @(EmailTestSuccess.Value ? "Koneksi SMTP Mailcow berhasil dan email terkirim ke kotak masuk/inbox penerima." : "Periksa rincian diagnostik di bawah ini untuk melihat kendala jaringan/otentikasi.")
+                </div>
+                @if (!string.IsNullOrEmpty(EmailTestResult))
+                {
+                    <details open class="mt-2">
+                        <summary class="fw-bold small text-secondary cursor-pointer">Lihat Rincian Diagnostik Lengkap (SMTP Handshake Log)</summary>
+                        <pre class="bg-dark text-light p-3 rounded-3 mt-2 mb-0 font-monospace small" style="max-height: 250px; overflow-y: auto; white-space: pre-wrap;">@EmailTestResult</pre>
+                    </details>
+                }
+            </div>
+        }
     </div>
 
     <!-- Active Designated Tim IT Card -->
@@ -395,6 +469,24 @@ else
     private string ActiveTab = "tim-it";
     private string SearchKeyword = "";
     private string TagFilter = "all";
+
+    private string TestRecipientEmail = "frian_p@smk.baktinusantara666.sch.id";
+    private bool IsTestingEmail = false;
+    private bool? EmailTestSuccess = null;
+    private string? EmailTestResult = null;
+
+    private async Task ExecuteEmailTest()
+    {
+        if (string.IsNullOrWhiteSpace(TestRecipientEmail)) return;
+        IsTestingEmail = true;
+        EmailTestSuccess = null;
+        EmailTestResult = null;
+
+        var result = await EmailService.TestEmailConnectionAsync(TestRecipientEmail.Trim());
+        EmailTestSuccess = result.Success;
+        EmailTestResult = result.Details;
+        IsTestingEmail = false;
+    }
 
     private int AppointedTimITCount => UsersList.Count(u => u.RoleName == "Teknisi");
     private int GuruCount => UsersList.Count(u => u.DepartmentOrClass?.Contains("Guru", StringComparison.OrdinalIgnoreCase) == true);

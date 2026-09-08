@@ -181,11 +181,14 @@ namespace BaknusITCare.Services
                     }
                     catch { }
 
-                    // Selalu pastikan admin master masuk dalam daftar penerima notifikasi IT
-                    string masterAdmin = "admin@smk.baktinusantara666.sch.id";
-                    if (!timItEmails.Any(e => e.Equals(masterAdmin, StringComparison.OrdinalIgnoreCase)))
+                    // Selalu pastikan admin master dan petugas IT resmi menerima alert
+                    string[] defaultItRecipients = new[] { "frian_p@smk.baktinusantara666.sch.id", "admin@smk.baktinusantara666.sch.id" };
+                    foreach (var itRec in defaultItRecipients)
                     {
-                        timItEmails.Add(masterAdmin);
+                        if (!timItEmails.Any(e => e.Equals(itRec, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            timItEmails.Add(itRec);
+                        }
                     }
 
                     // 1. Kirim email konfirmasi tanda terima ke Pembuat Tiket (Pelapor)
@@ -268,10 +271,13 @@ namespace BaknusITCare.Services
                     }
                     catch { }
 
-                    string masterAdmin = "admin@smk.baktinusantara666.sch.id";
-                    if (!timItEmails.Any(e => e.Equals(masterAdmin, StringComparison.OrdinalIgnoreCase)))
+                    string[] defaultItRecipients = new[] { "frian_p@smk.baktinusantara666.sch.id", "admin@smk.baktinusantara666.sch.id" };
+                    foreach (var itRec in defaultItRecipients)
                     {
-                        timItEmails.Add(masterAdmin);
+                        if (!timItEmails.Any(e => e.Equals(itRec, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            timItEmails.Add(itRec);
+                        }
                     }
 
                     // Kirim ke pembuat tiket dan seluruh Tim IT

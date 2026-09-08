@@ -349,6 +349,98 @@ namespace BaknusITCare.Services
             _logger.LogError(lastEx, "GAGAL TOTAL: Tidak dapat mengirim email ke {Recipient} setelah mencoba seluruh jalur koneksi SMTP.", recipientEmail);
             return false;
         }
+
+        public async Task<(bool Success, string Details)> TestEmailConnectionAsync(string recipientEmail)
+        {
+            var log = new System.Text.StringBuilder();
+            log.AppendLine($"=== MEMULAI PENGUJIAN KONEKSI SMTP KE MAILCOW ===");
+            log.AppendLine($"Waktu Pengujian: {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
+            log.AppendLine($"Target Email Penerima: {recipientEmail}");
+
+            string host = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
+            int port = int.TryParse(_config["Mailcow:SmtpPort"], out var p) ? p : 587;
+            string username = _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
+            string password = _config["Mailcow:SmtpPassword"] ?? "buhun666";
+            string senderName = _config["Mailcow:SenderName"] ?? "BaknusITCare - Layanan IT Sekolah";
+
+            log.AppendLine($"Akun Pengirim (Kredensial): {username}");
+            log.AppendLine($"Host & Port Terkonfigurasi: {host}:{port}");
+
+            if (!MailboxAddress.TryParse(recipientEmail.Trim(), out var toAddress))
+            {
+                log.AppendLine($"[ERROR] Format alamat email penerima '{recipientEmail}' tidak valid.");
+                return (false, log.ToString());
+            }
+
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(senderName, username));
+            message.To.Add(toAddress);
+            message.Subject = $"[TEST IT-CARE] Verifikasi Pengiriman Email Petugas IT ({DateTime.Now:HH:mm:ss})";
+            
+            message.Body = new TextPart(TextFormat.Html)
+            {
+                Text = $@"
+<div style=""font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9;"">
+    <div style=""max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; border-top: 5px solid #107c41; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"">
+        <h3 style=""color: #107c41; margin-top: 0;"">✅ Uji Coba Pengiriman Email Berhasil!</h3>
+        <p>Halo <strong>Petugas IT SMK Bakti Nusantara 666</strong>,</p>
+        <p>Email ini dikirimkan secara langsung dari sistem <strong>BaknusITCare</strong> untuk memverifikasi bahwa akun pengirim <code>{username}</code> telah berfungsi 100% normal.</p>
+        <div style=""background: #f0f7fd; padding: 12px; border-radius: 6px; font-size: 13px; color: #0078d4;"">
+            <strong>Kredensial Aktif:</strong><br/>
+            - Pengirim: {username}<br/>
+            - Penerima: {recipientEmail}<br/>
+            - Status: Terkirim Sukses via SMTP Mailcow
+        </div>
+        <p style=""font-size: 12px; color: #777; margin-top: 20px;"">&copy; 2026 Tim IT Infrastructure - SMK Bakti Nusantara 666</p>
+    </div>
+</div>"
+            };
+
+            var connectionTargets = new (string Host, int Port, SecureSocketOptions Sec)[]
+            {
+                (host, port, SecureSocketOptions.StartTls),
+                (host, 465, SecureSocketOptions.SslOnConnect),
+                (host, 587, SecureSocketOptions.StartTlsWhenAvailable),
+                ("host.docker.internal", 587, SecureSocketOptions.StartTls),
+                ("172.17.0.1", 587, SecureSocketOptions.StartTls),
+                (host, 25, SecureSocketOptions.StartTlsWhenAvailable)
+            };
+
+            foreach (var target in connectionTargets)
+            {
+                log.AppendLine($"\n--> Menguji koneksi ke {target.Host}:{target.Port} (Mode: {target.Sec})...");
+                try
+                {
+                    using var smtp = new SmtpClient();
+                    smtp.Timeout = 10000;
+                    smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                    smtp.CheckCertificateRevocation = false;
+
+                    await smtp.ConnectAsync(target.Host, target.Port, target.Sec);
+                    log.AppendLine($"    [OK] Terhubung ke socket {target.Host}:{target.Port}.");
+
+                    smtp.AuthenticationMechanisms.Remove("XOAUTH2");
+                    log.AppendLine($"    [OK] Melakukan otentikasi dengan user '{username}'...");
+                    await smtp.AuthenticateAsync(username, password);
+                    log.AppendLine($"    [OK] Otentikasi BERHASIL!");
+
+                    log.AppendLine($"    [OK] Mengirim pesan email ke '{recipientEmail}'...");
+                    await smtp.SendAsync(message);
+                    log.AppendLine($"    [OK] Pesan DITERIMA oleh server SMTP Mailcow!");
+
+                    await smtp.DisconnectAsync(true);
+                    log.AppendLine($"\n=== KESIMPULAN: PENGIRIMAN EMAIL BERHASIL 100% VIA {target.Host}:{target.Port} ===");
+                    return (true, log.ToString());
+                }
+                catch (Exception ex)
+                {
+                    log.AppendLine($"    [GAGAL] {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            log.AppendLine($"\n=== KESIMPULAN: GAGAL MENGIRIM KE SEMUA TARGET ENDPOINT ===");
+            return (false, log.ToString());
+        }
     }
 }
 
