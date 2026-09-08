@@ -180,29 +180,27 @@
                             </label>
                             <select class="form-select form-select-lg bg-white" @bind="SelectedLocation">
                                 <option value="">-- Pilih Ruangan Kejadian Kendala --</option>
-                                <option value="Ruang Workshop">Ruang Workshop</option>
-                                <option value="Ruang Kepsek">Ruang Kepsek</option>
-                                <option value="Ruang Bahagian">Ruang Bahagian</option>
-                                <option value="Wifi lantai 1">Wifi lantai 1</option>
-                                <option value="Ruang BK">Ruang BK</option>
-                                <option value="Ruang Guru">Ruang Guru</option>
-                                <option value="Wifi lantai 2 Timur (deket lab AKT)">Wifi lantai 2 Timur (deket lab AKT)</option>
-                                <option value="Wifi lantai 2 Barat">Wifi lantai 2 Barat</option>
-                                <option value="Wifi lantai 2 Selatan">Wifi lantai 2 Selatan</option>
-                                <option value="Lab Akuntansi">Lab Akuntansi</option>
-                                <option value="Ruang TU Keuangan">Ruang TU Keuangan</option>
-                                <option value="Ruang Perpustakaan">Ruang Perpustakaan</option>
-                                <option value="Lab Animasi">Lab Animasi</option>
-                                <option value="Lab DKV">Lab DKV</option>
-                                <option value="Ruang TU">Ruang TU</option>
-                                <option value="Lab PK lantai 1">Lab PK lantai 1</option>
-                                <option value="Lab PK lantai 2">Lab PK lantai 2</option>
-                                <option value="Lab PK Lantai 3">Lab PK Lantai 3</option>
-                                <option value="Ruang Photografi">Ruang Photografi</option>
-                                <option value="Lab Pemasaran">Lab Pemasaran</option>
-                                <option value="Lainnya">Lainnya</option>
+                                <option value="Ruang Workshop">1. Ruang Workshop</option>
+                                <option value="Ruang Kepsek">2. Ruang Kepsek</option>
+                                <option value="Ruang Bahagian">3. Ruang Bahagian</option>
+                                <option value="Wifi lantai 1">4. Wifi lantai 1</option>
+                                <option value="Ruang BK, Ruang Guru">5. Ruang BK, Ruang Guru</option>
+                                <option value="Wifi lantai 2 Timur (deket lab AKT) . Wifi lantai 2 Barat">6. Wifi lantai 2 Timur (deket lab AKT) . Wifi lantai 2 Barat</option>
+                                <option value="Wifi lantai 2 Selatan">7. Wifi lantai 2 Selatan</option>
+                                <option value="Lab Akuntansi">8. Lab Akuntansi</option>
+                                <option value="Ruang TU Keuangan">9. Ruang TU Keuangan</option>
+                                <option value="Ruang Perpustakaan">10. Ruang Perpustakaan</option>
+                                <option value="Lab Animasi">11. Lab Animasi</option>
+                                <option value="Lab DKV">12. Lab DKV</option>
+                                <option value="Ruang TU">13. Ruang TU</option>
+                                <option value="Lab PK lantai 1">14. Lab PK lantai 1</option>
+                                <option value="Lab PK lantai 2">15. Lab PK lantai 2</option>
+                                <option value="Lab PK Lantai 3">16. Lab PK Lantai 3</option>
+                                <option value="Ruang Photografi">17. Ruang Photografi</option>
+                                <option value="Lab Pemasaran">18. Lab Pemasaran</option>
+                                <option value="Lainnya">19. Lainnya</option>
                             </select>
-                            @if (SelectedLocation == "Lainnya")
+                            @if (SelectedLocation != null && SelectedLocation.Contains("Lainnya"))
                             {
                                 <div class="mt-2">
                                     <input type="text" class="form-control bg-white" placeholder="Tuliskan nama ruangan / lokasi lainnya..." @bind="CustomLocation" />
@@ -420,7 +418,7 @@
                 Status = TicketStatus.Baru
             };
 
-            string finalLocation = SelectedLocation == "Lainnya" && !string.IsNullOrWhiteSpace(CustomLocation)
+            string finalLocation = (SelectedLocation != null && SelectedLocation.Contains("Lainnya")) && !string.IsNullOrWhiteSpace(CustomLocation)
                 ? $"Lainnya ({CustomLocation.Trim()})"
                 : SelectedLocation;
 
