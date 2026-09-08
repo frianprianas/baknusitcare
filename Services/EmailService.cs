@@ -282,14 +282,29 @@ namespace BaknusITCare.Services
             return await SendEmailAsync(technicianEmail, subject, bodyHtml);
         }
 
+        private static string? _overrideUsername;
+        private static string? _overridePassword;
+
+        public void UpdateSmtpCredentials(string username, string password)
+        {
+            if (!string.IsNullOrWhiteSpace(username)) _overrideUsername = username.Trim();
+            if (!string.IsNullOrWhiteSpace(password)) _overridePassword = password;
+        }
+
+        public (string Username, string Password) GetCurrentSmtpCredentials()
+        {
+            string user = _overrideUsername ?? _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
+            string pass = _overridePassword ?? _config["Mailcow:SmtpPassword"] ?? "buhun666";
+            return (user, pass);
+        }
+
         private async Task<bool> SendEmailAsync(string recipientEmail, string subject, string bodyHtml)
         {
             if (string.IsNullOrWhiteSpace(recipientEmail)) return false;
 
             string host = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
             int port = int.TryParse(_config["Mailcow:SmtpPort"], out var p) ? p : 587;
-            string username = _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
-            string password = _config["Mailcow:SmtpPassword"] ?? "buhun666";
+            var (username, password) = GetCurrentSmtpCredentials();
             string senderName = _config["Mailcow:SenderName"] ?? "BaknusITCare - Layanan IT Sekolah";
 
             if (!MailboxAddress.TryParse(recipientEmail.Trim(), out var toAddress))
@@ -304,20 +319,10 @@ namespace BaknusITCare.Services
             message.Subject = subject;
             message.Body = new TextPart(TextFormat.Html) { Text = bodyHtml };
 
-            // Daftar target koneksi SMTP bertingkat untuk memastikan pengiriman selalu tembus:
-            // 1. Port 587 dengan STARTTLS wajib (standar Mailcow)
-            // 2. Port 465 dengan SSL/TLS langsung
-            // 3. Port 587 dengan StartTlsWhenAvailable
-            // 4. host.docker.internal (menembus bridge Docker ke host Ubuntu)
-            // 5. IP Gateway Docker 172.17.0.1
             var connectionTargets = new (string Host, int Port, SecureSocketOptions Sec)[]
             {
                 (host, port, SecureSocketOptions.StartTls),
-                (host, 465, SecureSocketOptions.SslOnConnect),
-                (host, 587, SecureSocketOptions.StartTlsWhenAvailable),
-                ("host.docker.internal", 587, SecureSocketOptions.StartTls),
-                ("172.17.0.1", 587, SecureSocketOptions.StartTls),
-                (host, 25, SecureSocketOptions.StartTlsWhenAvailable)
+                (host, 465, SecureSocketOptions.SslOnConnect)
             };
 
             Exception? lastEx = null;
@@ -326,7 +331,7 @@ namespace BaknusITCare.Services
                 try
                 {
                     using var smtp = new SmtpClient();
-                    smtp.Timeout = 8000; // 8 detik per endpoint agar tidak membekukan sistem
+                    smtp.Timeout = 5000;
                     smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
                     smtp.CheckCertificateRevocation = false;
 
@@ -350,7 +355,7 @@ namespace BaknusITCare.Services
             return false;
         }
 
-        public async Task<(bool Success, string Details)> TestEmailConnectionAsync(string recipientEmail)
+        public async Task<(bool Success, string Details)> TestEmailConnectionAsync(string recipientEmail, string? customSenderEmail = null, string? customSenderPassword = null)
         {
             var log = new System.Text.StringBuilder();
             log.AppendLine($"=== MEMULAI PENGUJIAN KONEKSI SMTP KE MAILCOW ===");
@@ -359,8 +364,9 @@ namespace BaknusITCare.Services
 
             string host = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
             int port = int.TryParse(_config["Mailcow:SmtpPort"], out var p) ? p : 587;
-            string username = _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
-            string password = _config["Mailcow:SmtpPassword"] ?? "buhun666";
+            var (defaultUser, defaultPass) = GetCurrentSmtpCredentials();
+            string username = !string.IsNullOrWhiteSpace(customSenderEmail) ? customSenderEmail.Trim() : defaultUser;
+            string password = !string.IsNullOrWhiteSpace(customSenderPassword) ? customSenderPassword : defaultPass;
             string senderName = _config["Mailcow:SenderName"] ?? "BaknusITCare - Layanan IT Sekolah";
 
             log.AppendLine($"Akun Pengirim (Kredensial): {username}");
@@ -399,11 +405,7 @@ namespace BaknusITCare.Services
             var connectionTargets = new (string Host, int Port, SecureSocketOptions Sec)[]
             {
                 (host, port, SecureSocketOptions.StartTls),
-                (host, 465, SecureSocketOptions.SslOnConnect),
-                (host, 587, SecureSocketOptions.StartTlsWhenAvailable),
-                ("host.docker.internal", 587, SecureSocketOptions.StartTls),
-                ("172.17.0.1", 587, SecureSocketOptions.StartTls),
-                (host, 25, SecureSocketOptions.StartTlsWhenAvailable)
+                (host, 465, SecureSocketOptions.SslOnConnect)
             };
 
             foreach (var target in connectionTargets)
@@ -412,7 +414,7 @@ namespace BaknusITCare.Services
                 try
                 {
                     using var smtp = new SmtpClient();
-                    smtp.Timeout = 10000;
+                    smtp.Timeout = 5000;
                     smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
                     smtp.CheckCertificateRevocation = false;
 
@@ -421,8 +423,42 @@ namespace BaknusITCare.Services
 
                     smtp.AuthenticationMechanisms.Remove("XOAUTH2");
                     log.AppendLine($"    [OK] Melakukan otentikasi dengan user '{username}'...");
-                    await smtp.AuthenticateAsync(username, password);
-                    log.AppendLine($"    [OK] Otentikasi BERHASIL!");
+                    
+                    try
+                    {
+                        await smtp.AuthenticateAsync(username, password);
+                        log.AppendLine($"    [OK] Otentikasi BERHASIL!");
+                    }
+                    catch (AuthenticationException authEx)
+                    {
+                        log.AppendLine($"    [GAGAL] Otentikasi ditolak: {authEx.Message}");
+                        if (username.Contains("@"))
+                        {
+                            string localUser = username.Split('@')[0];
+                            log.AppendLine($"    --> Mencoba alternatif otentikasi menggunakan username lokal '{localUser}'...");
+                            try
+                            {
+                                await smtp.AuthenticateAsync(localUser, password);
+                                log.AppendLine($"    [OK] Otentikasi BERHASIL menggunakan username '{localUser}'!");
+                                username = localUser;
+                            }
+                            catch (Exception altEx)
+                            {
+                                log.AppendLine($"    [GAGAL] Alternatif '{localUser}' juga ditolak: {altEx.Message}");
+                                log.AppendLine($"\n[DIAGNOSTIK PENTING]:");
+                                log.AppendLine($"Error 535 artinya Mailcow Postfix/Dovecot menolak kredensial ini.");
+                                log.AppendLine($"Penyebab utama:");
+                                log.AppendLine($"1. Akun '{username}' belum dibuat sebagai 'Mailbox' (Kotak Surat) di Mailcow Web UI (Menu Mail Setup -> Mailboxes). Akun administrator web Mailcow tidak otomatis menjadi mailbox email!");
+                                log.AppendLine($"2. Atau password mailbox di Mailcow berbeda dengan password yang dimasukkan.");
+                                log.AppendLine($"Solusi: Buat Mailbox '{username}' di panel Mailcow atau gunakan email mailbox yang sudah aktif (misal akun staf/guru Anda) melalui formulir di atas.");
+                                throw;
+                            }
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
 
                     log.AppendLine($"    [OK] Mengirim pesan email ke '{recipientEmail}'...");
                     await smtp.SendAsync(message);
@@ -434,11 +470,11 @@ namespace BaknusITCare.Services
                 }
                 catch (Exception ex)
                 {
-                    log.AppendLine($"    [GAGAL] {ex.GetType().Name}: {ex.Message}");
+                    log.AppendLine($"    [STATUS] Percobaan ke {target.Host}:{target.Port} selesai: {ex.GetType().Name} - {ex.Message}");
                 }
             }
 
-            log.AppendLine($"\n=== KESIMPULAN: GAGAL MENGIRIM KE SEMUA TARGET ENDPOINT ===");
+            log.AppendLine($"\n=== KESIMPULAN: GAGAL MENGIRIM KARENA OTENTIKASI/KREDENSIAL DITOLAK MAILCOW ===");
             return (false, log.ToString());
         }
     }

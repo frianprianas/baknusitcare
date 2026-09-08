@@ -110,46 +110,72 @@ else
                         <i class="bi bi-envelope-check-fill fs-5"></i>
                     </span>
                     <div>
-                        <h5 class="fw-bold mb-0 text-dark">Uji Coba Pengiriman Email ke Petugas IT</h5>
-                        <small class="text-secondary">Verifikasi langsung pengiriman email dari server Mailcow (admin@smk.baktinusantara666.sch.id)</small>
+                        <h5 class="fw-bold mb-0 text-dark">Uji Coba & Konfigurasi Pengiriman Email Petugas IT</h5>
+                        <small class="text-secondary">Verifikasi koneksi dan otentikasi SMTP Mailcow (mail.smk.baktinusantara666.sch.id:587)</small>
                     </div>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
-                    <i class="bi bi-shield-lock-fill me-1"></i> Mode SMTP Terverifikasi
+                    <i class="bi bi-shield-check me-1"></i> Socket & STARTTLS Aktif
                 </div>
             </div>
         </div>
 
+        <div class="alert alert-info border-info-subtle bg-info-subtle text-dark small rounded-3 mb-3 py-2 px-3">
+            <i class="bi bi-info-circle-fill text-info me-2"></i>
+            <strong>Catatan Otentikasi Mailcow:</strong> SMTP Mailcow hanya menerima akun yang terdaftar sebagai <strong>Mailbox (Kotak Surat)</strong> di panel Mailcow (bukan akun web admin biasa). Jika akun <code>admin@smk.baktinusantara666.sch.id</code> belum dibuatkan mailbox atau password-nya berbeda, Anda dapat menyesuaikan akun pengirim & password-nya di bawah ini lalu klik <strong>"Simpan & Uji Coba Sekarang"</strong>.
+        </div>
+
         <div class="p-3 rounded-3 bg-light border mb-3">
-            <div class="row g-3 align-items-center">
-                <div class="col-12 col-md-7">
-                    <label class="form-label small fw-bold text-muted mb-1">Kirim Email Test Diagnostik Ke:</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="bi bi-person-badge text-primary"></i></span>
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label small fw-bold text-muted mb-1">Akun Pengirim (SMTP Mailbox):</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-send text-primary"></i></span>
+                        <input type="email" class="form-control" placeholder="admin@smk.baktinusantara666.sch.id" @bind="SenderEmail" />
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label small fw-bold text-muted mb-1">Password Pengirim (SMTP):</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-key text-primary"></i></span>
+                        <input type="password" class="form-control" placeholder="Password Mailbox" @bind="SenderPassword" />
+                    </div>
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label small fw-bold text-muted mb-1">Target Penerima (Test Email):</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-person-badge text-success"></i></span>
                         <input type="email" class="form-control" placeholder="frian_p@smk.baktinusantara666.sch.id" @bind="TestRecipientEmail" />
                     </div>
-                    <small class="text-muted">
-                        <i class="bi bi-info-circle me-1"></i>Sistem otomatis mendaftarkan <strong>frian_p@smk.baktinusantara666.sch.id</strong> dan <strong>admin@smk.baktinusantara666.sch.id</strong> sebagai penerima utama setiap ada tiket masuk/update status.
-                    </small>
                 </div>
-                <div class="col-12 col-md-5 d-flex align-items-end">
-                    <button class="btn btn-primary fw-bold w-100 py-2 rounded-pill shadow-sm" @onclick="ExecuteEmailTest" disabled="@IsTestingEmail">
+                <div class="col-12 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 pt-1">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check text-primary me-1"></i>Penerima tiket otomatis: <strong>frian_p@smk.baktinusantara666.sch.id</strong> & <strong>admin@smk.baktinusantara666.sch.id</strong>
+                    </small>
+                    <button class="btn btn-primary fw-bold px-4 py-2 rounded-pill shadow-sm" @onclick="ExecuteEmailTest" disabled="@IsTestingEmail">
                         @if (IsTestingEmail)
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
-                            <span>Menghubungi SMTP Server...</span>
+                            <span>Memeriksa Otentikasi SMTP...</span>
                         }
                         else
                         {
-                            <i class="bi bi-send-fill me-2"></i>
-                            <span>Kirim Email Uji Coba Sekarang</span>
+                            <i class="bi bi-lightning-charge-fill me-1"></i>
+                            <span>Simpan & Uji Coba Sekarang</span>
                         }
                     </button>
                 </div>
             </div>
         </div>
+
+        @if (!string.IsNullOrEmpty(SmtpSavedNotice))
+        {
+            <div class="alert alert-success border-success small rounded-3 py-2 px-3 mb-3 shadow-sm">
+                <i class="bi bi-check-circle-fill text-success me-2"></i>@SmtpSavedNotice
+            </div>
+        }
 
         @if (EmailTestSuccess.HasValue)
         {
@@ -157,11 +183,11 @@ else
                 <div class="d-flex align-items-center mb-2">
                     <i class="bi @(EmailTestSuccess.Value ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-4 me-2"></i>
                     <h6 class="fw-bold mb-0 @(EmailTestSuccess.Value ? "text-success" : "text-danger")">
-                        @(EmailTestSuccess.Value ? "Email Berhasil Terkirim ke Penerima!" : "Pengiriman Email Gagal!")
+                        @(EmailTestSuccess.Value ? "Email Berhasil Terkirim ke Penerima!" : "Pengiriman Email Gagal (Otentikasi Ditolak)!")
                     </h6>
                 </div>
                 <div class="small mb-2">
-                    @(EmailTestSuccess.Value ? "Koneksi SMTP Mailcow berhasil dan email terkirim ke kotak masuk/inbox penerima." : "Periksa rincian diagnostik di bawah ini untuk melihat kendala jaringan/otentikasi.")
+                    @(EmailTestSuccess.Value ? "Koneksi SMTP dan otentikasi akun berhasil! Email terkirim ke kotak masuk/inbox penerima." : "Periksa rincian diagnostik di bawah. Jika muncul error 535, sesuaikan email pengirim & password mailbox di form atas.")
                 </div>
                 @if (!string.IsNullOrEmpty(EmailTestResult))
                 {
@@ -470,10 +496,13 @@ else
     private string SearchKeyword = "";
     private string TagFilter = "all";
 
+    private string SenderEmail = "admin@smk.baktinusantara666.sch.id";
+    private string SenderPassword = "buhun666";
     private string TestRecipientEmail = "frian_p@smk.baktinusantara666.sch.id";
     private bool IsTestingEmail = false;
     private bool? EmailTestSuccess = null;
     private string? EmailTestResult = null;
+    private string? SmtpSavedNotice = null;
 
     private async Task ExecuteEmailTest()
     {
@@ -481,10 +510,18 @@ else
         IsTestingEmail = true;
         EmailTestSuccess = null;
         EmailTestResult = null;
+        SmtpSavedNotice = null;
 
-        var result = await EmailService.TestEmailConnectionAsync(TestRecipientEmail.Trim());
+        var result = await EmailService.TestEmailConnectionAsync(TestRecipientEmail.Trim(), SenderEmail.Trim(), SenderPassword);
         EmailTestSuccess = result.Success;
         EmailTestResult = result.Details;
+
+        if (result.Success)
+        {
+            EmailService.UpdateSmtpCredentials(SenderEmail.Trim(), SenderPassword);
+            SmtpSavedNotice = $"Berhasil! Kredensial pengirim '{SenderEmail.Trim()}' telah diverifikasi & disimpan. Seluruh notifikasi tiket kini aktif menggunakan akun ini!";
+        }
+
         IsTestingEmail = false;
     }
 
@@ -530,6 +567,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var creds = EmailService.GetCurrentSmtpCredentials();
+        SenderEmail = creds.Username;
+        SenderPassword = creds.Password;
         await LoadUsers();
     }
 
