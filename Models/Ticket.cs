@@ -27,26 +27,21 @@ namespace BaknusITCare.Models
         [Key]
         public int Id { get; set; }
 
-        [Required]
         [StringLength(30)]
-        public string TicketCode { get; set; } = string.Empty; // e.g. IT-202609-001
+        public string TicketCode { get; set; } = string.Empty; // e.g. NET-101, BID-101
 
-        [Required]
         [StringLength(200)]
         public string Title { get; set; } = string.Empty;
 
-        [Required]
         public string Description { get; set; } = string.Empty;
 
-        [Required]
         public int CategoryId { get; set; }
 
         [ForeignKey("CategoryId")]
         public TicketCategory? Category { get; set; }
 
-        [Required]
         [StringLength(100)]
-        public string Location { get; set; } = string.Empty; // e.g. Lab Komputer 1, Ruang Guru
+        public string Location { get; set; } = string.Empty; // e.g. Lab Komputer 1, Ruang Guru, atau Online
 
         [StringLength(100)]
         public string? AssetTag { get; set; } // e.g. PC-LAB1-05, PRN-TU-01

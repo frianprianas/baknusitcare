@@ -15,13 +15,13 @@
                 <div class="d-inline-flex p-3 bg-success bg-opacity-10 text-success rounded-circle fs-1 mb-3">
                     <i class="bi bi-check-circle-fill"></i>
                 </div>
-                <h3 class="fw-bold text-dark mb-1">Laporan Kendala Berhasil Diterima!</h3>
-                <p class="text-secondary small mx-auto mb-4" style="max-width: 500px;">
-                    Laporan Anda telah tercatat secara otomatis di sistem BaknusITCare dan notifikasi telah dikirimkan ke <strong>Tim IT</strong> serta email Anda.
+                <h3 class="fw-bold text-dark mb-1">Laporan Kendala Berhasil Dikirim!</h3>
+                <p class="text-secondary small mx-auto mb-4" style="max-width: 520px;">
+                    Laporan Anda telah tercatat di sistem BaknusITCare. Notifikasi alert telah dikirimkan ke <strong>Tim IT</strong> dan konfirmasi telah dikirim ke email Anda.
                 </p>
 
                 <!-- Prominent Ticket Number Box -->
-                <div class="p-4 bg-light rounded-4 border mx-auto mb-4" style="max-width: 480px;">
+                <div class="p-4 bg-light rounded-4 border mx-auto mb-4 shadow-sm" style="max-width: 480px;">
                     <span class="text-uppercase text-muted fw-bold small d-block mb-1">Nomor Tiket Pelacakan Anda</span>
                     <div class="display-5 fw-bold @(SubmittedTicket.TicketCode.StartsWith("NET") ? "text-primary" : "text-info") font-monospace mb-2">
                         #@SubmittedTicket.TicketCode
@@ -31,7 +31,7 @@
                         <span>@(IsCopied ? "Nomor Tiket Tersalin!" : "Salin Nomor Tiket")</span>
                     </button>
                     <div class="small text-muted border-top pt-2">
-                        <i class="bi bi-info-circle me-1 text-primary"></i>Simpan nomor tiket ini untuk mengecek status penanganan melalui menu <strong>Lacak Tiket</strong> kapan saja.
+                        <i class="bi bi-info-circle me-1 text-primary"></i>Simpan nomor tiket ini untuk melacak proses penanganan secara berkala.
                     </div>
                 </div>
 
@@ -59,32 +59,46 @@
                     <div>
                         <h3 class="fw-bold text-dark mb-1">Form Pengajuan Kendala IT</h3>
                         <p class="text-secondary small mb-0">
-                            Pilih layanan kendala di bawah untuk penanganan cepat oleh Tim Teknisi IT SMK Bakti Nusantara 666
+                            Pilih layanan kendala di bawah untuk penanganan oleh Tim IT SMK Bakti Nusantara 666
                         </p>
                     </div>
                 </div>
 
+                <!-- Active User Notice -->
                 <div class="alert alert-info d-flex align-items-center rounded-3 mb-4">
                     <i class="bi bi-info-circle-fill fs-4 me-3 text-info flex-shrink-0"></i>
                     <div class="small">
-                        <strong>Notifikasi Otomatis:</strong> Nomor tiket pendek pelacakan dan konfirmasi laporan akan dikirimkan ke email: <strong>@(UserSession.IsLoggedIn ? UserSession.CurrentUser?.Email : "email Anda")</strong>.
+                        <strong>Pelapor:</strong> @(UserSession.IsLoggedIn ? UserSession.CurrentUser?.FullName : "Pengguna") (@(UserSession.IsLoggedIn ? UserSession.CurrentUser?.Email : "email Anda")). Konfirmasi dan update penanganan akan dikirimkan ke email ini.
                     </div>
                 </div>
 
                 @if (!string.IsNullOrEmpty(ErrorMessage))
                 {
-                    <div class="alert alert-danger rounded-3 mb-4">
-                        <i class="bi bi-exclamation-triangle me-2"></i>@ErrorMessage
+                    <div class="alert alert-danger d-flex align-items-center rounded-3 mb-4 shadow-sm" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-danger flex-shrink-0"></i>
+                        <div>
+                            <strong>Perhatian:</strong> @ErrorMessage
+                        </div>
                     </div>
                 }
 
-                <!-- STEP 1: Pilih 2 Layanan Utama -->
+                @if (IsSubmitting)
+                {
+                    <div class="alert alert-primary d-flex align-items-center rounded-3 mb-4 shadow-sm" role="alert">
+                        <span class="spinner-border spinner-border-sm me-3 text-primary flex-shrink-0" role="status"></span>
+                        <div>
+                            <strong>Sedang Mengirim Laporan...</strong> Sistem sedang mendaftarkan tiket Anda dan menyiarkan notifikasi email ke Tim IT.
+                        </div>
+                    </div>
+                }
+
+                <!-- STEP 1: PILIH DARI 2 LAYANAN UTAMA -->
                 <div class="mb-4">
                     <label class="form-label fw-bold text-dark mb-2">
                         1. Pilih Layanan Kendala <span class="text-danger">*</span>
                     </label>
                     <div class="row g-3">
-                        <!-- Option 1: Layanan Internet -->
+                        <!-- Pilihan 1: Layanan Internet -->
                         <div class="col-12 col-md-6">
                             <div class="service-card p-3 rounded-4 border-2 @(SelectedServiceType == "Internet" ? "active-internet" : "")" 
                                  @onclick='() => SelectServiceType("Internet")'>
@@ -95,13 +109,13 @@
                                         </div>
                                         <div>
                                             <h5 class="fw-bold mb-0 text-dark">Layanan Internet</h5>
-                                            <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.7rem;">Kode: NET-xxx</span>
+                                            <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.7rem;">Tiket: NET-xxx</span>
                                         </div>
                                     </div>
                                     <input type="radio" name="serviceType" checked="@(SelectedServiceType == "Internet")" class="form-check-input fs-5" />
                                 </div>
                                 <p class="small text-muted mb-2">
-                                    Meliputi: <strong>Internet tidak terkoneksi</strong>, <strong>WiFi / LAN tidak nyala</strong>, atau sinyal lemah.
+                                    Kendala jaringan fisik: <strong>Internet tidak terkoneksi</strong>, <strong>WiFi / LAN tidak nyala</strong>.
                                 </p>
                                 <span class="badge bg-light text-primary border" style="font-size: 0.75rem;">
                                     <i class="bi bi-clock me-1"></i>Estimasi SLA: ~2 Jam
@@ -109,7 +123,7 @@
                             </div>
                         </div>
 
-                        <!-- Option 2: Layanan BaknusID -->
+                        <!-- Pilihan 2: Layanan BaknusID -->
                         <div class="col-12 col-md-6">
                             <div class="service-card p-3 rounded-4 border-2 @(SelectedServiceType == "BaknusID" ? "active-baknusid" : "")" 
                                  @onclick='() => SelectServiceType("BaknusID")'>
@@ -120,7 +134,7 @@
                                         </div>
                                         <div>
                                             <h5 class="fw-bold mb-0 text-dark">Layanan BaknusID</h5>
-                                            <span class="badge bg-info bg-opacity-10 text-dark" style="font-size: 0.7rem;">Kode: BID-xxx</span>
+                                            <span class="badge bg-info bg-opacity-10 text-dark" style="font-size: 0.7rem;">Tiket: BID-xxx</span>
                                         </div>
                                     </div>
                                     <input type="radio" name="serviceType" checked="@(SelectedServiceType == "BaknusID")" class="form-check-input fs-5" />
@@ -136,71 +150,36 @@
                     </div>
                 </div>
 
-                <!-- SUB-OPTIONS BASED ON SERVICE TYPE -->
+                <!-- DETAIL SESUAI JENIS LAYANAN -->
                 @if (SelectedServiceType == "Internet")
                 {
+                    <!-- SECTION INTERNET: Lokasi + Keluhan -->
                     <div class="p-3 bg-primary bg-opacity-10 rounded-4 border border-primary border-opacity-25 mb-4">
                         <label class="form-label fw-bold text-dark mb-2">
                             <i class="bi bi-check2-circle text-primary me-1"></i>Jenis Kendala Internet:
                         </label>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "Internet tidak terkoneksi" ? "btn-primary" : "btn-light border")" 
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "Internet tidak terkoneksi" ? "btn-primary shadow-sm" : "btn-light border")" 
                                     @onclick='() => InternetSubIssue = "Internet tidak terkoneksi"'>
                                 <i class="bi bi-slash-circle me-1"></i> Internet Tidak Terkoneksi
                             </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "WiFi / LAN tidak nyala" ? "btn-primary" : "btn-light border")" 
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "WiFi / LAN tidak nyala" ? "btn-primary shadow-sm" : "btn-light border")" 
                                     @onclick='() => InternetSubIssue = "WiFi / LAN tidak nyala"'>
                                 <i class="bi bi-router me-1"></i> WiFi / LAN Tidak Nyala
                             </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "Sinyal Wi-Fi Lemah / RTO" ? "btn-primary" : "btn-light border")" 
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(InternetSubIssue == "Sinyal Wi-Fi Lemah / RTO" ? "btn-primary shadow-sm" : "btn-light border")" 
                                     @onclick='() => InternetSubIssue = "Sinyal Wi-Fi Lemah / RTO"'>
                                 <i class="bi bi-reception-2 me-1"></i> Sinyal Lemah / RTO
                             </button>
                         </div>
-                    </div>
-                }
-                else if (SelectedServiceType == "BaknusID")
-                {
-                    <div class="p-3 bg-info bg-opacity-10 rounded-4 border border-info border-opacity-25 mb-4">
-                        <label class="form-label fw-bold text-dark mb-2">
-                            <i class="bi bi-app-indicator text-info me-1"></i>Pilih Aplikasi BaknusID yang Bermasalah:
-                        </label>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "WebsiteBaknus" ? "btn-dark" : "btn-light border")" 
-                                    @onclick='() => BaknusIdApp = "WebsiteBaknus"'>
-                                🌐 Website Baknus
-                            </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "Baknusmail" ? "btn-dark" : "btn-light border")" 
-                                    @onclick='() => BaknusIdApp = "Baknusmail"'>
-                                ✉️ Baknus Mail (Mailcow)
-                            </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusAttend" ? "btn-dark" : "btn-light border")" 
-                                    @onclick='() => BaknusIdApp = "BaknusAttend"'>
-                                📋 Baknus Attend (Presensi)
-                            </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusDrive" ? "btn-dark" : "btn-light border")" 
-                                    @onclick='() => BaknusIdApp = "BaknusDrive"'>
-                                ☁️ Baknus Drive (Penyimpanan)
-                            </button>
-                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusClass" ? "btn-dark" : "btn-light border")" 
-                                    @onclick='() => BaknusIdApp = "BaknusClass"'>
-                                🎓 Baknus Class (LMS)
-                            </button>
-                        </div>
-                    </div>
-                }
 
-                <EditForm Model="NewTicket" OnValidSubmit="HandleSubmitTicket">
-                    <DataAnnotationsValidator />
-
-                    <!-- Location / Affected Area -->
-                    <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-7">
+                        <!-- Lokasi Ruangan (Wajib untuk Internet) -->
+                        <div class="mb-3">
                             <label class="form-label fw-bold text-dark">
-                                2. Lokasi / Ruangan <span class="text-danger">*</span>
+                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>Lokasi / Ruangan <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select form-select-lg bg-light" @bind="NewTicket.Location">
-                                <option value="">-- Pilih Lokasi Ruangan Sekolah --</option>
+                            <select class="form-select form-select-lg bg-white" @bind="SelectedLocation">
+                                <option value="">-- Pilih Ruangan Kejadian Kendala --</option>
                                 <option value="Lab Komputer 1 (Lantai 1)">Lab Komputer 1 (Lantai 1)</option>
                                 <option value="Lab Komputer 2 (Lantai 2)">Lab Komputer 2 (Lantai 2)</option>
                                 <option value="Lab Komputer 3 (Lantai 2)">Lab Komputer 3 (Lantai 2)</option>
@@ -213,70 +192,109 @@
                                 <option value="Kelas XII (Gedung C)">Kelas XII (Gedung C)</option>
                                 <option value="Perpustakaan Digital">Perpustakaan Digital</option>
                                 <option value="Aula / Lapangan Utama">Aula / Lapangan Utama</option>
-                                <option value="Akses dari Luar Sekolah / Rumah">Akses dari Luar Sekolah / Rumah</option>
-                                <option value="Lainnya">Lainnya / Ruangan Lain</option>
+                                <option value="Ruang Lainnya">Ruang Lainnya</option>
                             </select>
-                            <ValidationMessage For="() => NewTicket.Location" class="text-danger small" />
                         </div>
 
-                        <div class="col-12 col-md-5">
+                        <!-- Keluhan Kendala Internet (Wajib untuk Internet) -->
+                        <div class="mb-2">
                             <label class="form-label fw-bold text-dark">
-                                Tag Aset / Perangkat (Opsional)
+                                <i class="bi bi-chat-left-text-fill text-primary me-1"></i>Deskripsi Keluhan Kendala <span class="text-danger">*</span>
                             </label>
-                            <InputText @bind-Value="NewTicket.AssetTag" class="form-control form-control-lg bg-light font-monospace" placeholder="Contoh: PC-05, AP-RUANG-GURU" />
+                            <textarea rows="3" class="form-control bg-white" 
+                                      placeholder="Jelaskan kendala yang terjadi (contoh: lampu router mati, wifi tidak muncul di laptop, kabel LAN terlepas, internet lemot/RTO saat mengajar)..." 
+                                      @bind="ComplaintDescription"></textarea>
                         </div>
                     </div>
-
-                    <!-- Complaint Details -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark">
-                            3. Detail Keluhan <span class="text-danger">*</span>
+                }
+                else if (SelectedServiceType == "BaknusID")
+                {
+                    <!-- SECTION BAKNUSID: Cukup pilih aplikasi saja (laporan tidak usah diisi) -->
+                    <div class="p-3 bg-info bg-opacity-10 rounded-4 border border-info border-opacity-25 mb-4">
+                        <label class="form-label fw-bold text-dark mb-2">
+                            <i class="bi bi-app-indicator text-info me-1"></i>Pilih Aplikasi BaknusID yang Bermasalah:
                         </label>
-                        <InputTextArea @bind-Value="NewTicket.Description" rows="4" class="form-control bg-light" 
-                                       placeholder="@(SelectedServiceType == "Internet" ? "Jelaskan kronologi kendala internet, lampu router mati/menyala, pesan error di browser, atau titik lokasi wifi..." : "Jelaskan pesan error saat login, akun yang terkendala, menu yang tidak bisa diakses, atau kendala presensi/drive...")" />
-                        <ValidationMessage For="() => NewTicket.Description" class="text-danger small" />
-                    </div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "WebsiteBaknus" ? "btn-dark shadow-sm" : "btn-light border")" 
+                                    @onclick='() => BaknusIdApp = "WebsiteBaknus"'>
+                                🌐 Website Baknus
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "Baknusmail" ? "btn-dark shadow-sm" : "btn-light border")" 
+                                    @onclick='() => BaknusIdApp = "Baknusmail"'>
+                                ✉️ Baknus Mail (Mailcow)
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusAttend" ? "btn-dark shadow-sm" : "btn-light border")" 
+                                    @onclick='() => BaknusIdApp = "BaknusAttend"'>
+                                📋 Baknus Attend (Presensi)
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusDrive" ? "btn-dark shadow-sm" : "btn-light border")" 
+                                    @onclick='() => BaknusIdApp = "BaknusDrive"'>
+                                ☁️ Baknus Drive (Penyimpanan)
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 fw-semibold @(BaknusIdApp == "BaknusClass" ? "btn-dark shadow-sm" : "btn-light border")" 
+                                    @onclick='() => BaknusIdApp = "BaknusClass"'>
+                                🎓 Baknus Class (LMS)
+                            </button>
+                        </div>
 
-                    <!-- Priority Level -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold text-dark">4. Tingkat Urgensi</label>
-                        <div class="d-flex flex-wrap gap-2">
-                            <label class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Rendah ? "active btn-secondary text-white" : "")">
-                                <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Rendah)" @onchange="() => NewTicket.Priority = TicketPriority.Rendah" />
-                                🟢 Rendah (Masih Bisa Digunakan)
+                        <div class="alert alert-success d-flex align-items-center rounded-3 mb-2 bg-white border">
+                            <i class="bi bi-shield-check fs-4 me-3 text-success flex-shrink-0"></i>
+                            <div class="small text-dark">
+                                <strong>Kemudahan Layanan BaknusID:</strong> Khusus kendala Software / BaknusID, Anda <strong>tidak perlu repot mengisi form laporan lokasi atau deskripsi panjang</strong>. Cukup pilih aplikasi di atas lalu klik tombol <em>"Kirim Laporan Tiket"</em>. Tim IT akan langsung memeriksa akun (@(UserSession.IsLoggedIn ? UserSession.CurrentUser?.Email : "email Anda")) pada sistem terkait.
+                            </div>
+                        </div>
+
+                        <!-- Catatan Opsional jika ingin menyampaikan pesan khusus -->
+                        <div class="mt-3">
+                            <label class="form-label small text-muted mb-1">
+                                Catatan Tambahan (Opsional):
                             </label>
-                            <label class="btn btn-sm btn-outline-primary rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Sedang ? "active btn-primary text-white" : "")">
-                                <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Sedang)" @onchange="() => NewTicket.Priority = TicketPriority.Sedang" />
-                                🔵 Sedang (Standar)
-                            </label>
-                            <label class="btn btn-sm btn-outline-warning rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Tinggi ? "active btn-warning text-dark" : "")">
-                                <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Tinggi)" @onchange="() => NewTicket.Priority = TicketPriority.Tinggi" />
-                                🟠 Tinggi (Mengganggu PBM / Kerja)
-                            </label>
-                            <label class="btn btn-sm btn-outline-danger rounded-pill px-3 py-2 cursor-pointer @(NewTicket.Priority == TicketPriority.Darurat ? "active btn-danger text-white" : "")">
-                                <input type="radio" name="priority" class="d-none" checked="@(NewTicket.Priority == TicketPriority.Darurat)" @onchange="() => NewTicket.Priority = TicketPriority.Darurat" />
-                                🔴 Darurat (Layanan Mati Total)
-                            </label>
+                            <input type="text" class="form-control bg-white" placeholder="Opsional: contoh: lupa password, akun terkunci, dsb." @bind="BaknusIdNote" />
                         </div>
                     </div>
+                }
 
-                    <!-- Submit Actions -->
-                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
-                        <a href="tickets" class="btn btn-outline-secondary rounded-pill px-4">Batal</a>
-                        <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5 fw-bold shadow-sm" disabled="@IsSubmitting">
-                            @if (IsSubmitting)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                                <span>Mengirim Laporan...</span>
-                            }
-                            else
-                            {
-                                <i class="bi bi-send-fill me-2"></i>
-                                <span>Kirim Laporan Tiket</span>
-                            }
+                <!-- TINGKAT URGENSI -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark mb-2">Tingkat Urgensi Masalah</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm rounded-pill px-3 py-2 @(SelectedPriority == TicketPriority.Rendah ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => SelectedPriority = TicketPriority.Rendah">
+                            🟢 Rendah
+                        </button>
+                        <button type="button" class="btn btn-sm rounded-pill px-3 py-2 @(SelectedPriority == TicketPriority.Sedang ? "btn-primary shadow-sm" : "btn-outline-primary")" @onclick="() => SelectedPriority = TicketPriority.Sedang">
+                            🔵 Sedang (Standar)
+                        </button>
+                        <button type="button" class="btn btn-sm rounded-pill px-3 py-2 @(SelectedPriority == TicketPriority.Tinggi ? "btn-warning text-dark shadow-sm" : "btn-outline-warning text-dark")" @onclick="() => SelectedPriority = TicketPriority.Tinggi">
+                            🟠 Tinggi (Penting)
+                        </button>
+                        <button type="button" class="btn btn-sm rounded-pill px-3 py-2 @(SelectedPriority == TicketPriority.Darurat ? "btn-danger shadow-sm" : "btn-outline-danger")" @onclick="() => SelectedPriority = TicketPriority.Darurat">
+                            🔴 Darurat
                         </button>
                     </div>
-                </EditForm>
+                </div>
+
+                <!-- ACTION BUTTONS -->
+                <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                    <a href="tickets" class="btn btn-outline-secondary rounded-pill px-4">
+                        <i class="bi bi-arrow-left me-1"></i> Batal
+                    </a>
+
+                    <button type="button" 
+                            class="btn btn-primary btn-lg rounded-pill px-5 fw-bold shadow" 
+                            @onclick="HandleDirectSubmit" 
+                            disabled="@IsSubmitting">
+                        @if (IsSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Sedang Mengirim Laporan...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-send-fill me-2"></i>
+                            <span>Kirim Laporan Tiket</span>
+                        }
+                    </button>
+                </div>
             </div>
         }
     </div>
@@ -290,7 +308,7 @@
     }
     .service-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
     .active-internet {
         border-color: #0078d4 !important;
@@ -303,11 +321,16 @@
 </style>
 
 @code {
-    private Ticket NewTicket = new();
     private List<TicketCategory> Categories = new();
     private string SelectedServiceType = "Internet"; // "Internet" or "BaknusID"
     private string InternetSubIssue = "Internet tidak terkoneksi";
+    private string SelectedLocation = "";
+    private string ComplaintDescription = "";
+
     private string BaknusIdApp = "WebsiteBaknus";
+    private string BaknusIdNote = "";
+
+    private TicketPriority SelectedPriority = TicketPriority.Sedang;
 
     private string? ErrorMessage;
     private bool IsSubmitting = false;
@@ -317,87 +340,112 @@
     protected override async Task OnInitializedAsync()
     {
         Categories = await TicketService.GetCategoriesAsync();
-        ApplyCategoryMapping();
-
-        if (UserSession.IsLoggedIn && UserSession.CurrentUser != null)
-        {
-            NewTicket.RequesterId = UserSession.CurrentUser.Id;
-            NewTicket.RequesterName = UserSession.CurrentUser.FullName;
-            NewTicket.RequesterEmail = UserSession.CurrentUser.Email;
-        }
-        else
-        {
-            NewTicket.RequesterId = Guid.NewGuid().ToString();
-            NewTicket.RequesterName = "Tamu / Civitas Sekolah";
-            NewTicket.RequesterEmail = "admin@smk.baktinusantara666.sch.id";
-        }
     }
 
     private void SelectServiceType(string type)
     {
         SelectedServiceType = type;
-        ApplyCategoryMapping();
-    }
-
-    private void ApplyCategoryMapping()
-    {
-        if (SelectedServiceType == "Internet")
-        {
-            var cat = Categories.FirstOrDefault(c => c.Name.Contains("Internet", StringComparison.OrdinalIgnoreCase))
-                      ?? Categories.FirstOrDefault(c => c.Name.Contains("Jaringan", StringComparison.OrdinalIgnoreCase))
-                      ?? Categories.FirstOrDefault();
-            if (cat != null) NewTicket.CategoryId = cat.Id;
-        }
-        else
-        {
-            var cat = Categories.FirstOrDefault(c => c.Name.Contains("Baknus", StringComparison.OrdinalIgnoreCase) || c.Name.Contains("ID", StringComparison.OrdinalIgnoreCase))
-                      ?? Categories.FirstOrDefault(c => c.Name.Contains("Software", StringComparison.OrdinalIgnoreCase))
-                      ?? Categories.LastOrDefault();
-            if (cat != null) NewTicket.CategoryId = cat.Id;
-        }
-    }
-
-    private async Task HandleSubmitTicket()
-    {
-        if (string.IsNullOrWhiteSpace(NewTicket.Location) || string.IsNullOrWhiteSpace(NewTicket.Description))
-        {
-            ErrorMessage = "Mohon lengkapi Lokasi Ruangan dan Detail Keluhan.";
-            return;
-        }
-
-        // Generate friendly title
-        if (SelectedServiceType == "Internet")
-        {
-            NewTicket.Title = $"[Internet] {InternetSubIssue} di {NewTicket.Location}";
-        }
-        else
-        {
-            string appName = BaknusIdApp switch
-            {
-                "WebsiteBaknus" => "Website Baknus",
-                "Baknusmail" => "Baknus Mail",
-                "BaknusAttend" => "Baknus Attend",
-                "BaknusDrive" => "Baknus Drive",
-                "BaknusClass" => "Baknus Class",
-                _ => BaknusIdApp
-            };
-            NewTicket.Title = $"[BaknusID - {appName}] Kendala Akses & Layanan";
-        }
-
-        IsSubmitting = true;
         ErrorMessage = null;
+    }
+
+    private async Task HandleDirectSubmit()
+    {
+        ErrorMessage = null;
+
+        // VALIDASI LAYANAN INTERNET
+        if (SelectedServiceType == "Internet")
+        {
+            if (string.IsNullOrWhiteSpace(SelectedLocation))
+            {
+                ErrorMessage = "Mohon pilih Lokasi / Ruangan tempat terjadinya kendala internet!";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(ComplaintDescription))
+            {
+                ErrorMessage = "Mohon tuliskan keluhan kendala internet yang Anda alami!";
+                return;
+            }
+        }
+
+        // Tampilkan indikator UI bahwa sistem sedang memproses
+        IsSubmitting = true;
+        StateHasChanged();
 
         try
         {
-            ApplyCategoryMapping();
-            SubmittedTicket = await TicketService.CreateTicketAsync(NewTicket);
-            IsSubmitting = false;
+            // Tentukan kategori dari database
+            int categoryId = 0;
+            if (SelectedServiceType == "Internet")
+            {
+                var cat = Categories.FirstOrDefault(c => c.Name.Contains("Internet", StringComparison.OrdinalIgnoreCase))
+                          ?? Categories.FirstOrDefault(c => c.Name.Contains("Jaringan", StringComparison.OrdinalIgnoreCase))
+                          ?? Categories.FirstOrDefault();
+                if (cat != null) categoryId = cat.Id;
+            }
+            else
+            {
+                var cat = Categories.FirstOrDefault(c => c.Name.Contains("Baknus", StringComparison.OrdinalIgnoreCase) || c.Name.Contains("ID", StringComparison.OrdinalIgnoreCase))
+                          ?? Categories.FirstOrDefault(c => c.Name.Contains("Software", StringComparison.OrdinalIgnoreCase))
+                          ?? Categories.LastOrDefault();
+                if (cat != null) categoryId = cat.Id;
+            }
+
+            string requesterId = UserSession.CurrentUser?.Id ?? Guid.NewGuid().ToString();
+            string requesterName = UserSession.CurrentUser?.FullName ?? "Civitas Sekolah";
+            string requesterEmail = UserSession.CurrentUser?.Email ?? "admin@smk.baktinusantara666.sch.id";
+
+            var ticketToCreate = new Ticket
+            {
+                CategoryId = categoryId,
+                Priority = SelectedPriority,
+                RequesterId = requesterId,
+                RequesterName = requesterName,
+                RequesterEmail = requesterEmail,
+                Status = TicketStatus.Baru
+            };
+
+            if (SelectedServiceType == "Internet")
+            {
+                ticketToCreate.Title = $"[Internet] {InternetSubIssue} di {SelectedLocation}";
+                ticketToCreate.Location = SelectedLocation;
+                ticketToCreate.Description = ComplaintDescription.Trim();
+            }
+            else
+            {
+                string appName = GetAppName(BaknusIdApp);
+                ticketToCreate.Title = $"[BaknusID - {appName}] Kendala Akses Layanan Digital";
+                ticketToCreate.Location = "Online / Layanan Cloud BaknusID";
+                ticketToCreate.Description = !string.IsNullOrWhiteSpace(BaknusIdNote)
+                    ? $"Kendala pada layanan {appName}. Catatan pengguna: {BaknusIdNote.Trim()}"
+                    : $"Laporan kendala pada layanan {appName}. Mohon bantuan Tim IT untuk pengecekan akun & akses atas nama {requesterName} ({requesterEmail}).";
+            }
+
+            // Simpan ke database & siarkan email ke Tim IT
+            SubmittedTicket = await TicketService.CreateTicketAsync(ticketToCreate);
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Gagal mengirimkan laporan: {ex.Message}";
-            IsSubmitting = false;
+            ErrorMessage = $"Terjadi kesalahan saat memproses laporan: {ex.Message}";
         }
+        finally
+        {
+            IsSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetAppName(string key)
+    {
+        return key switch
+        {
+            "WebsiteBaknus" => "Website Baknus",
+            "Baknusmail" => "Baknus Mail (Mailcow)",
+            "BaknusAttend" => "Baknus Attend (Presensi)",
+            "BaknusDrive" => "Baknus Drive (Penyimpanan)",
+            "BaknusClass" => "Baknus Class (LMS)",
+            _ => key
+        };
     }
 
     private async Task CopySubmittedCode()
@@ -416,15 +464,12 @@
 
     private void ResetForm()
     {
-        NewTicket = new Ticket
-        {
-            RequesterId = UserSession.CurrentUser?.Id ?? Guid.NewGuid().ToString(),
-            RequesterName = UserSession.CurrentUser?.FullName ?? "Pengguna Sekolah",
-            RequesterEmail = UserSession.CurrentUser?.Email ?? "admin@smk.baktinusantara666.sch.id"
-        };
         SubmittedTicket = null;
         IsCopied = false;
         ErrorMessage = null;
-        ApplyCategoryMapping();
+        SelectedLocation = "";
+        ComplaintDescription = "";
+        BaknusIdNote = "";
+        SelectedServiceType = "Internet";
     }
 }
