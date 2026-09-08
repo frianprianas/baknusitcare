@@ -1,0 +1,379 @@
+@page "/track"
+@page "/track/{TicketCodeParam}"
+@inject ITicketService TicketService
+@inject UserSessionService UserSession
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Lacak Status Tiket - BaknusITCare</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <!-- Search Header Card -->
+        <div class="fluent-card p-4 p-md-5 bg-white mb-4 text-center shadow-sm">
+            <div class="d-inline-flex p-3 bg-primary bg-opacity-10 text-primary rounded-circle fs-2 mb-3">
+                <i class="bi bi-search"></i>
+            </div>
+            <h3 class="fw-bold text-dark mb-2">Lacak Status Tiket Layanan IT</h3>
+            <p class="text-secondary small mx-auto mb-4" style="max-width: 500px;">
+                Ketahui perkembangan penanganan kendala Anda secara real-time. Cukup masukkan nomor tiket yang Anda dapatkan saat melapor.
+            </p>
+
+            <!-- Search Form -->
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-9">
+                    <div class="input-group input-group-lg shadow-sm rounded-pill overflow-hidden border">
+                        <span class="input-group-text bg-white border-0 ps-4">
+                            <i class="bi bi-hash text-muted fs-4"></i>
+                        </span>
+                        <input type="text" 
+                               class="form-control border-0 px-2 fw-bold text-dark font-monospace fs-5" 
+                               placeholder="Contoh: NET-101 atau BID-101" 
+                               @bind="SearchInput" 
+                               @bind:event="oninput"
+                               @onkeydown="HandleKeyDown" />
+                        <button class="btn btn-primary px-4 fw-bold" type="button" @onclick="SearchTicket" disabled="@IsSearching">
+                            @if (IsSearching)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-arrow-right-circle-fill me-1"></i>
+                            }
+                            <span>Lacak</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-center gap-2 mt-3 flex-wrap">
+                <small class="text-muted">Format yang didukung:</small>
+                <span class="badge bg-light text-primary border font-monospace">NET-101</span>
+                <span class="badge bg-light text-purple border font-monospace">BID-101</span>
+                <span class="badge bg-light text-secondary border font-monospace">101</span>
+            </div>
+        </div>
+
+        <!-- Tracking Results Section -->
+        @if (IsSearching)
+        {
+            <div class="fluent-card p-5 text-center bg-white shadow-sm">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted mb-0">Mencari data tiket...</p>
+            </div>
+        }
+        else if (HasSearched && TrackedTicket == null)
+        {
+            <div class="fluent-card p-5 text-center bg-white shadow-sm">
+                <i class="bi bi-shield-x fs-1 text-danger d-block mb-3"></i>
+                <h5 class="fw-bold text-dark mb-1">Tiket Tidak Ditemukan</h5>
+                <p class="text-muted small mx-auto mb-3" style="max-width: 450px;">
+                    Nomor tiket <strong>"@SearchInput"</strong> tidak terdaftar di sistem. Mohon pastikan kembali nomor tiket yang tercantum pada email konfirmasi Anda.
+                </p>
+                <a href="tickets/create" class="btn btn-outline-primary btn-sm rounded-pill px-4">
+                    <i class="bi bi-plus-circle me-1"></i> Buat Laporan Baru
+                </a>
+            </div>
+        }
+        else if (TrackedTicket != null)
+        {
+            <!-- Ticket Found Card -->
+            <div class="fluent-card p-4 p-md-5 bg-white shadow-sm mb-4 border-top border-4 @(TrackedTicket.TicketCode.StartsWith("NET") ? "border-primary" : "border-info")">
+                <!-- Header Badge Info -->
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center pb-3 border-bottom gap-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <span class="badge @(TrackedTicket.TicketCode.StartsWith("NET") ? "bg-primary" : "bg-info text-dark") fs-5 fw-bold font-monospace px-3 py-2 rounded-pill shadow-sm">
+                                #@TrackedTicket.TicketCode
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" title="Salin Nomor Tiket" @onclick="CopyTicketCode">
+                                <i class="bi @(IsCopied ? "bi-check2 text-success" : "bi-clipboard")"></i>
+                                <span class="small ms-1">@(IsCopied ? "Tersalin!" : "Salin")</span>
+                            </button>
+                            <span class="badge bg-light text-dark border">
+                                @(TrackedTicket.Category?.Name ?? "Layanan IT")
+                            </span>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-1">@TrackedTicket.Title</h4>
+                        <div class="small text-muted">
+                            <i class="bi bi-calendar3 me-1"></i>Dilaporkan: @TrackedTicket.CreatedAt.AddHours(7).ToString("dd MMMM yyyy HH:mm") WIB
+                        </div>
+                    </div>
+
+                    <div class="text-md-end">
+                        <span class="badge fs-6 px-3 py-2 rounded-pill @GetStatusBadgeClass(TrackedTicket.Status)">
+                            @GetStatusLabel(TrackedTicket.Status)
+                        </span>
+                        <div class="small text-muted mt-1">
+                            Urgensi: <strong class="text-dark">@TrackedTicket.Priority</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual Progress Stepper -->
+                <div class="py-4 my-2 border-bottom">
+                    <div class="row text-center g-2 position-relative">
+                        <!-- Step 1: Laporan Diterima -->
+                        <div class="col-4">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle fs-4 mb-2 bg-success text-white" style="width: 46px; height: 46px;">
+                                <i class="bi bi-check-lg"></i>
+                            </div>
+                            <div class="fw-bold small text-dark">Laporan Diterima</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Sistem / Auto-Reply</div>
+                        </div>
+
+                        <!-- Step 2: Sedang Ditangani -->
+                        <div class="col-4">
+                            @{
+                                bool isHandling = TrackedTicket.Status == TicketStatus.Diproses || TrackedTicket.Status == TicketStatus.MenungguSparepart;
+                                bool isPassedHandling = TrackedTicket.Status == TicketStatus.Selesai || TrackedTicket.Status == TicketStatus.Ditutup;
+                            }
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle fs-4 mb-2 @(isPassedHandling ? "bg-success text-white" : (isHandling ? "bg-warning text-dark" : "bg-light text-muted border"))" style="width: 46px; height: 46px;">
+                                @if (isPassedHandling)
+                                {
+                                    <i class="bi bi-check-lg"></i>
+                                }
+                                else if (isHandling)
+                                {
+                                    <i class="bi bi-tools"></i>
+                                }
+                                else
+                                {
+                                    <span>2</span>
+                                }
+                            </div>
+                            <div class="fw-bold small @(isHandling ? "text-warning" : (isPassedHandling ? "text-dark" : "text-muted"))">
+                                Sedang Ditangani
+                            </div>
+                            <div class="text-muted" style="font-size: 0.75rem;">
+                                @(string.IsNullOrEmpty(TrackedTicket.AssignedTechnicianName) ? "Menunggu Penugasan" : TrackedTicket.AssignedTechnicianName)
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Selesai -->
+                        <div class="col-4">
+                            @{
+                                bool isFinished = TrackedTicket.Status == TicketStatus.Selesai || TrackedTicket.Status == TicketStatus.Ditutup;
+                            }
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle fs-4 mb-2 @(isFinished ? "bg-success text-white" : "bg-light text-muted border")" style="width: 46px; height: 46px;">
+                                @if (isFinished)
+                                {
+                                    <i class="bi bi-star-fill"></i>
+                                }
+                                else
+                                {
+                                    <span>3</span>
+                                }
+                            </div>
+                            <div class="fw-bold small @(isFinished ? "text-success" : "text-muted")">
+                                Selesai Diperbaiki
+                            </div>
+                            <div class="text-muted" style="font-size: 0.75rem;">
+                                @(isFinished ? "Tuntas" : "Penyelesaian Kendala")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ticket Details Box -->
+                <div class="row g-3 my-3">
+                    <div class="col-12 col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100">
+                            <span class="d-block small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-geo-alt-fill me-1 text-danger"></i>Lokasi / Ruangan:</span>
+                            <div class="fw-bold text-dark">@TrackedTicket.Location</div>
+                            @if (!string.IsNullOrEmpty(TrackedTicket.AssetTag))
+                            {
+                                <span class="badge bg-white text-secondary border mt-1 font-monospace">@TrackedTicket.AssetTag</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100">
+                            <span class="d-block small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-person-badge-fill me-1 text-primary"></i>Petugas Tim IT:</span>
+                            <div class="fw-bold text-dark">@(TrackedTicket.AssignedTechnicianName ?? "Belum ada petugas ditunjuk (Menunggu Tim IT)")</div>
+                            <div class="small text-muted">Batas SLA: @TrackedTicket.DueDate.AddHours(7).ToString("dd MMM HH:mm") WIB</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complaint Description -->
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <span class="d-block small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-chat-left-dots-fill me-1 text-primary"></i>Rincian Keluhan yang Dilaporkan:</span>
+                    <p class="text-dark mb-0" style="white-space: pre-line;">@TrackedTicket.Description</p>
+                </div>
+
+                <!-- Timeline / Comments -->
+                @if (TrackedTicket.Comments.Any(c => !c.IsInternal))
+                {
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-clock-history me-2 text-primary"></i>Catatan Perkembangan Penanganan:</h6>
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var c in TrackedTicket.Comments.Where(x => !x.IsInternal).OrderByDescending(x => x.CreatedAt))
+                            {
+                                <div class="p-3 bg-white rounded-3 border border-start border-3 border-primary shadow-sm">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark small">@c.UserName (@c.UserRole)</span>
+                                        <span class="text-muted small" style="font-size: 0.75rem;">@c.CreatedAt.AddHours(7).ToString("dd MMM HH:mm") WIB</span>
+                                    </div>
+                                    <div class="text-dark small">@c.Message</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Customer Rating if Resolved -->
+                @if (TrackedTicket.Status == TicketStatus.Selesai || TrackedTicket.Status == TicketStatus.Ditutup)
+                {
+                    <div class="mt-4 p-4 bg-success bg-opacity-10 border border-success rounded-3 text-center">
+                        <h6 class="fw-bold text-success mb-2"><i class="bi bi-star-fill me-2"></i>Penilaian Layanan IT</h6>
+                        @if (TrackedTicket.Rating.HasValue)
+                        {
+                            <div class="text-warning fs-4 mb-1">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <i class="bi @(i <= TrackedTicket.Rating.Value ? "bi-star-fill" : "bi-star")"></i>
+                                }
+                            </div>
+                            <p class="text-dark small italic mb-0">"@TrackedTicket.FeedbackComments"</p>
+                        }
+                        else
+                        {
+                            <p class="small text-muted mb-2">Berikan rating bintang untuk kinerja penanganan kendala ini:</p>
+                            <div class="d-flex justify-content-center gap-2 mb-3">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    int star = i;
+                                    <button class="btn btn-outline-warning rounded-circle p-2 fs-4" @onclick="() => SubmitStarRating(star)">
+                                        <i class="bi @(star <= UserRating ? "bi-star-fill text-warning" : "bi-star text-muted")"></i>
+                                    </button>
+                                }
+                            </div>
+                            <div class="input-group input-group-sm mb-2 mx-auto" style="max-width: 400px;">
+                                <input type="text" class="form-control" placeholder="Tulis masukan Anda (opsional)..." @bind="FeedbackText" />
+                                <button class="btn btn-success fw-bold" @onclick="SubmitFeedback">Kirim Penilaian</button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <a href="tickets" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                        <i class="bi bi-arrow-left me-1"></i> Ke Daftar Tiket
+                    </a>
+                    <a href="tickets/detail/@TrackedTicket.Id" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold">
+                        Buka Detail Lengkap <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? TicketCodeParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "code")]
+    public string? CodeQueryParam { get; set; }
+
+    private string SearchInput = "";
+    private bool IsSearching = false;
+    private bool HasSearched = false;
+    private Ticket? TrackedTicket;
+    private bool IsCopied = false;
+
+    private int UserRating = 5;
+    private string FeedbackText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        string? targetCode = !string.IsNullOrWhiteSpace(TicketCodeParam) ? TicketCodeParam : CodeQueryParam;
+        if (!string.IsNullOrWhiteSpace(targetCode))
+        {
+            SearchInput = targetCode;
+            await SearchTicket();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchTicket();
+        }
+    }
+
+    private async Task SearchTicket()
+    {
+        if (string.IsNullOrWhiteSpace(SearchInput)) return;
+
+        IsSearching = true;
+        HasSearched = true;
+        IsCopied = false;
+
+        TrackedTicket = await TicketService.GetTicketByCodeAsync(SearchInput.Trim());
+        IsSearching = false;
+    }
+
+    private async Task CopyTicketCode()
+    {
+        if (TrackedTicket == null) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", TrackedTicket.TicketCode);
+            IsCopied = true;
+            await Task.Delay(2500);
+            IsCopied = false;
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    private async Task SubmitStarRating(int star)
+    {
+        UserRating = star;
+        if (TrackedTicket != null)
+        {
+            await TicketService.SubmitRatingAsync(TrackedTicket.Id, UserRating, FeedbackText);
+            TrackedTicket = await TicketService.GetTicketByIdAsync(TrackedTicket.Id);
+        }
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (TrackedTicket != null)
+        {
+            await TicketService.SubmitRatingAsync(TrackedTicket.Id, UserRating, FeedbackText);
+            TrackedTicket = await TicketService.GetTicketByIdAsync(TrackedTicket.Id);
+        }
+    }
+
+    private string GetStatusLabel(TicketStatus status)
+    {
+        return status switch
+        {
+            TicketStatus.Baru => "Baru (Menunggu)",
+            TicketStatus.Diproses => "Sedang Ditangani",
+            TicketStatus.MenungguSparepart => "Menunggu Sparepart/Vendor",
+            TicketStatus.Selesai => "Selesai (Resolved)",
+            TicketStatus.Ditutup => "Ditutup (Closed)",
+            _ => status.ToString()
+        };
+    }
+
+    private string GetStatusBadgeClass(TicketStatus status)
+    {
+        return status switch
+        {
+            TicketStatus.Baru => "bg-info text-dark",
+            TicketStatus.Diproses => "bg-warning text-dark",
+            TicketStatus.MenungguSparepart => "bg-secondary text-white",
+            TicketStatus.Selesai => "bg-success text-white",
+            TicketStatus.Ditutup => "bg-dark text-white",
+            _ => "bg-primary text-white"
+        };
+    }
+}

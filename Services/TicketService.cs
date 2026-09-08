@@ -93,13 +93,19 @@ namespace BaknusITCare.Services
 
         public async Task<Ticket?> GetTicketByCodeAsync(string code)
         {
+            if (string.IsNullOrWhiteSpace(code)) return null;
+            string cleanCode = code.Trim().TrimStart('#').ToUpper();
+
             try
             {
                 return await _dbContext.Tickets
                     .Include(t => t.Category)
                     .Include(t => t.Comments)
                     .Include(t => t.Attachments)
-                    .FirstOrDefaultAsync(t => t.TicketCode == code);
+                    .FirstOrDefaultAsync(t => t.TicketCode.ToUpper() == cleanCode 
+                                           || t.TicketCode.ToUpper() == $"NET-{cleanCode}"
+                                           || t.TicketCode.ToUpper() == $"BID-{cleanCode}"
+                                           || t.TicketCode.EndsWith($"-{cleanCode}"));
             }
             catch (Exception ex)
             {
@@ -110,16 +116,6 @@ namespace BaknusITCare.Services
 
         public async Task<Ticket> CreateTicketAsync(Ticket ticket)
         {
-            string datePrefix = DateTime.UtcNow.ToString("yyyyMM");
-            int todayCount = 0;
-            try
-            {
-                todayCount = await _dbContext.Tickets.CountAsync(t => t.CreatedAt.Year == DateTime.UtcNow.Year && t.CreatedAt.Month == DateTime.UtcNow.Month);
-            }
-            catch { }
-
-            ticket.TicketCode = $"IT-{datePrefix}-{(todayCount + 1):D3}";
-
             TicketCategory? category = null;
             try
             {
@@ -127,7 +123,36 @@ namespace BaknusITCare.Services
             }
             catch { }
 
-            int slaHours = category?.DefaultSlaHours ?? 4;
+            // Tentukan prefix nomor tiket yang mudah dibaca & dilacak:
+            // NET-101 (Layanan Internet), BID-101 (Layanan BaknusID)
+            string prefix = "NET";
+            if (category != null && (
+                category.Name.Contains("Baknus", StringComparison.OrdinalIgnoreCase) || 
+                category.Name.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
+                category.Name.Contains("Software", StringComparison.OrdinalIgnoreCase)))
+            {
+                prefix = "BID";
+            }
+            else
+            {
+                prefix = "NET";
+            }
+
+            int countForPrefix = 0;
+            try
+            {
+                countForPrefix = await _dbContext.Tickets.CountAsync(t => t.TicketCode.StartsWith(prefix));
+            }
+            catch { }
+
+            int nextNum = 101 + countForPrefix;
+            while (await _dbContext.Tickets.AnyAsync(t => t.TicketCode == $"{prefix}-{nextNum}"))
+            {
+                nextNum++;
+            }
+            ticket.TicketCode = $"{prefix}-{nextNum}";
+
+            int slaHours = category?.DefaultSlaHours ?? (prefix == "NET" ? 2 : 4);
             ticket.DueDate = DateTime.UtcNow.AddHours(slaHours);
             ticket.CreatedAt = DateTime.UtcNow;
             ticket.Status = TicketStatus.Baru;

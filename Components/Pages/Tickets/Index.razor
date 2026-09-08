@@ -106,8 +106,12 @@
                     {
                         <tr>
                             <td class="ps-4">
-                                <span class="badge bg-dark font-monospace">#@ticket.TicketCode</span>
-                                <div class="small text-muted">@ticket.CreatedAt.ToString("dd MMM HH:mm")</div>
+                                <a href="track/@ticket.TicketCode" class="text-decoration-none" title="Klik untuk lacak tiket ini">
+                                    <span class="badge @(ticket.TicketCode.StartsWith("NET") ? "bg-primary" : "bg-info text-dark") font-monospace px-2 py-1 shadow-sm">
+                                        #@ticket.TicketCode
+                                    </span>
+                                </a>
+                                <div class="small text-muted" style="font-size: 0.75rem;">@ticket.CreatedAt.ToString("dd MMM HH:mm")</div>
                             </td>
                             <td>
                                 <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">@ticket.Title</div>

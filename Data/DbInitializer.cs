@@ -13,64 +13,60 @@ namespace BaknusITCare.Data
         {
             await context.Database.EnsureCreatedAsync();
 
-            // Seed Categories if empty
-            if (!await context.TicketCategories.AnyAsync())
+            // Ensure Primary Categories (Layanan Internet & Layanan BaknusID)
+            var internetCat = await context.TicketCategories.FirstOrDefaultAsync(c => c.Name == "Layanan Internet" || c.Name == "Jaringan & Wi-Fi");
+            if (internetCat == null)
             {
-                var categories = new List<TicketCategory>
+                internetCat = new TicketCategory
                 {
-                    new TicketCategory
-                    {
-                        Name = "Komputer & Laptop",
-                        Description = "Perangkat PC Desktop, Laptop Guru/Siswa, Keyboard, Mouse, Bluescreen, OS Windows/Linux",
-                        Icon = "Desktop",
-                        DefaultSlaHours = 4,
-                        IsActive = true
-                    },
-                    new TicketCategory
-                    {
-                        Name = "Jaringan & Wi-Fi",
-                        Description = "Koneksi Internet Wi-Fi Sekolah, Kabel LAN, Sinyal Lemah, Router, Mikrotik",
-                        Icon = "Wifi",
-                        DefaultSlaHours = 2,
-                        IsActive = true
-                    },
-                    new TicketCategory
-                    {
-                        Name = "Printer & Scanner",
-                        Description = "Printer Macet (Paper Jam), Tinta Habis, Sharing Printer Lab/TU, Scanner Driver",
-                        Icon = "Print",
-                        DefaultSlaHours = 6,
-                        IsActive = true
-                    },
-                    new TicketCategory
-                    {
-                        Name = "LCD Proyektor & Audio",
-                        Description = "Proyektor Kelas/Lab, Kabel HDMI/VGA, Sound System Ruang Rapat/Aula",
-                        Icon = "ProjectionScreen",
-                        DefaultSlaHours = 2,
-                        IsActive = true
-                    },
-                    new TicketCategory
-                    {
-                        Name = "SIAKAD & Software",
-                        Description = "Aplikasi Raport, CBT Ujian, Microsoft 365, Mailcow Email, Reset Password",
-                        Icon = "AppGeneric",
-                        DefaultSlaHours = 8,
-                        IsActive = true
-                    },
-                    new TicketCategory
-                    {
-                        Name = "Perangkat Kelas & Lainnya",
-                        Description = "Stop Kontak, AC Lab Komputer, CCTV Kelas, Kerusakan Fisik Meja Lab",
-                        Icon = "Wrench",
-                        DefaultSlaHours = 12,
-                        IsActive = true
-                    }
+                    Name = "Layanan Internet",
+                    Description = "Internet tidak terkoneksi, WiFi / LAN tidak nyala",
+                    Icon = "Wifi",
+                    DefaultSlaHours = 2,
+                    IsActive = true
                 };
-
-                await context.TicketCategories.AddRangeAsync(categories);
-                await context.SaveChangesAsync();
+                await context.TicketCategories.AddAsync(internetCat);
             }
+            else
+            {
+                internetCat.Name = "Layanan Internet";
+                internetCat.Description = "Internet tidak terkoneksi, WiFi / LAN tidak nyala";
+                internetCat.Icon = "Wifi";
+                internetCat.IsActive = true;
+            }
+
+            var baknusIdCat = await context.TicketCategories.FirstOrDefaultAsync(c => c.Name == "Layanan BaknusID" || c.Name == "SIAKAD & Software");
+            if (baknusIdCat == null)
+            {
+                baknusIdCat = new TicketCategory
+                {
+                    Name = "Layanan BaknusID",
+                    Description = "Website Baknus, Baknus Mail, Baknus Attend, Baknus Drive, Baknus Class",
+                    Icon = "AppGeneric",
+                    DefaultSlaHours = 4,
+                    IsActive = true
+                };
+                await context.TicketCategories.AddAsync(baknusIdCat);
+            }
+            else
+            {
+                baknusIdCat.Name = "Layanan BaknusID";
+                baknusIdCat.Description = "Website Baknus, Baknus Mail, Baknus Attend, Baknus Drive, Baknus Class";
+                baknusIdCat.Icon = "AppGeneric";
+                baknusIdCat.IsActive = true;
+            }
+
+            await context.SaveChangesAsync();
+
+            // Deactivate other categories so complaints are strictly focused on Internet and BaknusID
+            var otherCategories = await context.TicketCategories
+                .Where(c => c.Id != internetCat.Id && c.Id != baknusIdCat.Id && c.IsActive)
+                .ToListAsync();
+            foreach (var other in otherCategories)
+            {
+                other.IsActive = false;
+            }
+            await context.SaveChangesAsync();
 
             // Seed Admin & Master Staff Users if empty
             if (!await context.Users.AnyAsync())

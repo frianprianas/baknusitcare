@@ -50,7 +50,13 @@ namespace BaknusITCare.Services
             <p><strong>Deskripsi Kendala:</strong></p>
             <p style=""background: #fafafa; border: 1px solid #e1e1e1; padding: 12px; border-radius: 4px; font-style: italic;"">{ticket.Description}</p>
 
-            <p style=""margin-top: 25px;"">Tim Teknisi IT akan segera memproses laporan Anda. Anda akan menerima pemberitahuan email otomatis setiap kali ada pembaruan status.</p>
+            <div style=""text-align: center; margin: 25px 0;"">
+                <a href=""https://baknusitcare.smkbn666.sch.id/track/{ticket.TicketCode}"" style=""background-color: #0078d4; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; box-shadow: 0 3px 8px rgba(0,0,0,0.15);"">
+                    🔍 Lacak Status Tiket #{ticket.TicketCode} &rarr;
+                </a>
+            </div>
+
+            <p style=""margin-top: 15px;"">Tim Teknisi IT akan segera memproses laporan Anda. Anda dapat melacak perkembangan penanganan kapan saja menggunakan nomor tiket di atas.</p>
         </div>
         <div style=""padding: 16px 24px; background-color: #f8f9fa; border-top: 1px solid #eeeeee; font-size: 12px; color: #777777; text-align: center;"">
             &copy; 2026 Tim IT Infrastructure - SMK Bakti Nusantara 666.<br/>
@@ -202,8 +208,12 @@ namespace BaknusITCare.Services
             </div>
 
             <div style=""text-align: center; margin-top: 25px;"">
-                <a href=""https://baknusitcare.smkbn666.sch.id/tickets/detail/{ticket.Id}"" style=""color: #0078d4; font-weight: 600; text-decoration: none;"">
-                    Lihat Detail & Riwayat Tiket di BaknusITCare &rarr;
+                <a href=""https://baknusitcare.smkbn666.sch.id/track/{ticket.TicketCode}"" style=""background-color: #0078d4; color: #ffffff; padding: 10px 24px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.12);"">
+                    🔍 Lacak Status Tiket #{ticket.TicketCode} &rarr;
+                </a>
+                <br/>
+                <a href=""https://baknusitcare.smkbn666.sch.id/tickets/detail/{ticket.Id}"" style=""color: #666666; font-size: 13px; text-decoration: underline;"">
+                    Lihat Detail Lengkap & Riwayat Tiket
                 </a>
             </div>
         </div>
