@@ -62,10 +62,76 @@ namespace BaknusITCare.Services
             return await SendEmailAsync(ticket.RequesterEmail, subject, bodyHtml);
         }
 
+        public async Task<bool> SendNewTicketAlertToTimITAsync(Ticket ticket, System.Collections.Generic.List<string> timItEmails)
+        {
+            if (timItEmails == null || !timItEmails.Any()) return false;
+
+            string subject = $"[NOTIFIKASI TIM IT] Tiket Kendala Baru Masuk #{ticket.TicketCode} - {ticket.Title}";
+
+            string bodyHtml = $@"
+<div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; padding: 30px 15px;"">
+    <div style=""max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-top: 5px solid #d83b01;"">
+        <div style=""padding: 24px; background-color: #d83b01; color: #ffffff;"">
+            <h2 style=""margin: 0; font-size: 22px; font-weight: 600;"">🚨 BaknusITCare - Laporan Kendala Baru Masuk</h2>
+            <p style=""margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;"">Pemberitahuan Khusus Anggota Tim IT & Administrator</p>
+        </div>
+        <div style=""padding: 24px; color: #333333;"">
+            <p style=""font-size: 16px;"">Halo <strong>Rekan Tim IT SMK Bakti Nusantara 666</strong>,</p>
+            <p>Terdapat laporan kendala IT baru yang diajukan oleh pengguna dan memerlukan tindak lanjut penanganan:</p>
+            
+            <div style=""background-color: #fff4ce; border-left: 4px solid #d83b01; padding: 15px; margin: 20px 0; border-radius: 4px;"">
+                <table style=""width: 100%; border-collapse: collapse; font-size: 14px;"">
+                    <tr><td style=""padding: 5px 0; font-weight: 600; width: 140px;"">Nomor Tiket:</td><td><span style=""background: #d83b01; color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: bold;"">#{ticket.TicketCode}</span></td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Pelapor:</td><td><strong>{ticket.RequesterName}</strong> ({ticket.RequesterEmail})</td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Judul Masalah:</td><td><strong>{ticket.Title}</strong></td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Kategori:</td><td><span style=""background: #e1dfdd; padding: 2px 8px; border-radius: 4px;"">{ticket.Category?.Name ?? "Umum"}</span></td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Lokasi / Ruangan:</td><td><strong style=""color: #0078d4;"">{ticket.Location}</strong></td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Tag / Aset:</td><td>{ticket.AssetTag ?? "-"}</td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Tingkat Urgensi:</td><td><strong style=""color: #d13438;"">{ticket.Priority}</strong></td></tr>
+                    <tr><td style=""padding: 5px 0; font-weight: 600;"">Batas Waktu SLA:</td><td>Selesai dalam {ticket.Category?.DefaultSlaHours ?? 4} Jam ({ticket.DueDate.AddHours(7):HH:mm, dd MMM yyyy})</td></tr>
+                </table>
+            </div>
+
+            <p><strong>Rincian Kendala dari Pelapor:</strong></p>
+            <p style=""background: #fafafa; border: 1px solid #e1e1e1; padding: 12px; border-radius: 4px; font-style: italic; white-space: pre-line;"">{ticket.Description}</p>
+
+            <div style=""text-align: center; margin: 30px 0;"">
+                <a href=""https://baknusitcare.smkbn666.sch.id/tickets/detail/{ticket.Id}"" style=""background-color: #0078d4; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; box-shadow: 0 3px 8px rgba(0,0,0,0.15);"">
+                    Buka & Tindak Lanjuti Tiket Ini &rarr;
+                </a>
+            </div>
+
+            <p style=""font-size: 13px; color: #666666;"">Silakan segera lakukan penanganan di lokasi dan perbarui status tiket menjadi <em>'Diproses'</em> di aplikasi BaknusITCare.</p>
+        </div>
+        <div style=""padding: 16px 24px; background-color: #f8f9fa; border-top: 1px solid #eeeeee; font-size: 12px; color: #777777; text-align: center;"">
+            &copy; 2026 Tim IT Infrastructure - SMK Bakti Nusantara 666.<br/>
+            Email notifikasi ini dikirimkan otomatis kepada seluruh Anggota Tim IT & Administrator.
+        </div>
+    </div>
+</div>";
+
+            bool anySuccess = false;
+            foreach (var recipient in timItEmails)
+            {
+                if (string.IsNullOrWhiteSpace(recipient)) continue;
+                var res = await SendEmailAsync(recipient.Trim(), subject, bodyHtml);
+                if (res) anySuccess = true;
+            }
+
+            return anySuccess;
+        }
+
         public async Task<bool> SendTicketStatusUpdatedAsync(Ticket ticket, string oldStatus, string newStatus, string? commentMessage = null)
         {
-            string subject = $"[BaknusITCare] Pembaharuan Status Tiket #{ticket.TicketCode}: {newStatus}";
-            
+            string subject = newStatus switch
+            {
+                "Diproses" => $"[BaknusITCare - SEDANG DITANGANI] Laporan Kendala #{ticket.TicketCode}: {ticket.Title}",
+                "Selesai" => $"[BaknusITCare - SELESAI] Laporan Kendala #{ticket.TicketCode} Telah Berhasil Diperbaiki",
+                "MenungguSparepart" => $"[BaknusITCare - MENUNGGU SPAREPART] Tiket #{ticket.TicketCode}: Menunggu Pengadaan Onderdil",
+                "Ditutup" => $"[BaknusITCare - DITUTUP] Tiket #{ticket.TicketCode} Telah Ditutup",
+                _ => $"[BaknusITCare] Pembaharuan Status Tiket #{ticket.TicketCode}: {newStatus}"
+            };
+
             string statusBadgeColor = newStatus switch
             {
                 "Diproses" => "#ffaa00",
@@ -75,44 +141,75 @@ namespace BaknusITCare.Services
                 _ => "#0078d4"
             };
 
+            string statusHeadline = newStatus switch
+            {
+                "Diproses" => "Laporan Kendala Anda SEDANG DITANGANI oleh Tim IT",
+                "Selesai" => "Laporan Kendala Anda TELAH SELESAI DIPERBAIKI! 🎉",
+                "MenungguSparepart" => "Laporan Sedang Menunggu Pengadaan Sparepart / Vendor",
+                "Ditutup" => "Tiket Kendala IT Telah Resmi Ditutup",
+                _ => $"Status Tiket Diperbarui: {newStatus}"
+            };
+
+            string statusDescription = newStatus switch
+            {
+                "Diproses" => $"Laporan kendala IT Anda saat ini <strong>SEDANG DITANGANI</strong> oleh petugas Tim IT (<strong>{ticket.AssignedTechnicianName ?? "Petugas Tim IT"}</strong>). Petugas sedang memeriksa sistem atau menuju lokasi ruangan.",
+                "Selesai" => $"Kabar baik! Laporan kendala IT Anda telah <strong>BERHASIL DIPERBAIKI / SELESAI</strong>. Silakan periksa kembali perangkat/layanan Anda.",
+                "MenungguSparepart" => "Petugas telah melakukan pemeriksaan awal, dan penanganan memerlukan penggantian sparepart atau koordinasi vendor luar.",
+                _ => $"Status laporan Anda telah diperbarui dari <strong>{oldStatus}</strong> menjadi <strong>{newStatus}</strong>."
+            };
+
             string extraNotice = newStatus == "Selesai" 
-                ? "<p style=\"background: #dff6dd; border: 1px solid #107c41; color: #107c41; padding: 12px; border-radius: 4px; font-weight: 600;\">Tiket Anda telah dinyatakan SELESAI. Mohon luangkan waktu 30 detik untuk memberikan Rating & Ulasan Kepuasan di aplikasi BaknusITCare.</p>"
+                ? $@"<div style=""background: #dff6dd; border: 1px solid #107c41; color: #107c41; padding: 16px; border-radius: 6px; margin: 20px 0; text-align: center;"">
+                        <strong style=""font-size: 15px;"">⭐ Berikan Penilaian Kepuasan Layanan:</strong>
+                        <p style=""margin: 6px 0 12px 0; font-size: 13px;"">Bantu kami meningkatkan kualitas layanan IT sekolah dengan memberikan rating bintang & ulasan.</p>
+                        <a href=""https://baknusitcare.smkbn666.sch.id/tickets/detail/{ticket.Id}"" style=""background: #107c41; color: #ffffff; padding: 8px 20px; border-radius: 20px; text-decoration: none; font-weight: bold; display: inline-block;"">
+                            Beri Rating & Ulasan Sekarang
+                        </a>
+                     </div>"
                 : "";
 
             string commentBlock = !string.IsNullOrWhiteSpace(commentMessage)
-                ? $"<p><strong>Pesan dari Petugas IT ({ticket.AssignedTechnicianName ?? "IT Support"}):</strong></p><p style=\"background: #f0f4f8; border-left: 4px solid #0078d4; padding: 12px; border-radius: 4px;\">{commentMessage}</p>"
+                ? $"<div style=\"background: #f0f4f8; border-left: 4px solid #0078d4; padding: 12px 16px; margin: 15px 0; border-radius: 4px;\"><strong style=\"color: #0078d4;\">Pesan / Catatan dari Petugas IT ({ticket.AssignedTechnicianName ?? "Tim IT Support"}):</strong><p style=\"margin: 6px 0 0 0; color: #333;\">{commentMessage}</p></div>"
                 : "";
 
             string bodyHtml = $@"
 <div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; padding: 30px 15px;"">
     <div style=""max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-top: 5px solid {statusBadgeColor};"">
         <div style=""padding: 24px; background-color: #0078d4; color: #ffffff;"">
-            <h2 style=""margin: 0; font-size: 22px; font-weight: 600;"">BaknusITCare - Update Status Tiket</h2>
-            <p style=""margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;"">Laporan IT #{ticket.TicketCode}</p>
+            <h2 style=""margin: 0; font-size: 20px; font-weight: 600;"">BaknusITCare - Update Status Penanganan</h2>
+            <p style=""margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;"">Laporan IT #{ticket.TicketCode} - {ticket.Title}</p>
         </div>
         <div style=""padding: 24px; color: #333333;"">
             <p style=""font-size: 16px;"">Halo <strong>{ticket.RequesterName}</strong>,</p>
-            <p>Ada pembaharuan status pada laporan kendala IT Anda:</p>
+            <p style=""font-size: 15px; color: #222;"">{statusDescription}</p>
             
             <div style=""text-align: center; margin: 20px 0;"">
-                <span style=""background-color: {statusBadgeColor}; color: #ffffff; padding: 8px 18px; border-radius: 20px; font-size: 16px; font-weight: bold; display: inline-block;"">
-                    Status Baru: {newStatus}
+                <span style=""background-color: {statusBadgeColor}; color: #ffffff; padding: 8px 22px; border-radius: 20px; font-size: 15px; font-weight: bold; display: inline-block;"">
+                    Status: {statusHeadline}
                 </span>
             </div>
 
-            {extraNotice}
             {commentBlock}
+            {extraNotice}
 
-            <table style=""width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;"">
-                <tr><td style=""padding: 4px 0; font-weight: 600; width: 140px;"">Judul Kendala:</td><td>{ticket.Title}</td></tr>
-                <tr><td style=""padding: 4px 0; font-weight: 600;"">Petugas Penanggungjawab:</td><td>{ticket.AssignedTechnicianName ?? "Staf IT Support"}</td></tr>
-                <tr><td style=""padding: 4px 0; font-weight: 600;"">Lokasi:</td><td>{ticket.Location}</td></tr>
-            </table>
+            <div style=""background-color: #f9f9f9; border: 1px solid #e5e5e5; padding: 14px; border-radius: 6px; margin-top: 15px;"">
+                <table style=""width: 100%; border-collapse: collapse; font-size: 13px;"">
+                    <tr><td style=""padding: 4px 0; font-weight: 600; width: 140px; color: #666;"">Nomor Tiket:</td><td><strong style=""color: #0078d4;"">#{ticket.TicketCode}</strong></td></tr>
+                    <tr><td style=""padding: 4px 0; font-weight: 600; color: #666;"">Judul Kendala:</td><td>{ticket.Title}</td></tr>
+                    <tr><td style=""padding: 4px 0; font-weight: 600; color: #666;"">Petugas Penanggungjawab:</td><td><strong>{ticket.AssignedTechnicianName ?? "Tim IT Support"}</strong></td></tr>
+                    <tr><td style=""padding: 4px 0; font-weight: 600; color: #666;"">Lokasi Ruangan:</td><td>{ticket.Location}</td></tr>
+                </table>
+            </div>
 
-            <p style=""margin-top: 25px;"">Terima kasih atas kesabaran Anda selama penanganan kendala IT ini.</p>
+            <div style=""text-align: center; margin-top: 25px;"">
+                <a href=""https://baknusitcare.smkbn666.sch.id/tickets/detail/{ticket.Id}"" style=""color: #0078d4; font-weight: 600; text-decoration: none;"">
+                    Lihat Detail & Riwayat Tiket di BaknusITCare &rarr;
+                </a>
+            </div>
         </div>
         <div style=""padding: 16px 24px; background-color: #f8f9fa; border-top: 1px solid #eeeeee; font-size: 12px; color: #777777; text-align: center;"">
-            &copy; 2026 Tim IT Infrastructure - SMK Bakti Nusantara 666.
+            &copy; 2026 Tim IT Infrastructure - SMK Bakti Nusantara 666.<br/>
+            Email ini dikirimkan otomatis oleh Mailcow Server BaknusITCare.
         </div>
     </div>
 </div>";

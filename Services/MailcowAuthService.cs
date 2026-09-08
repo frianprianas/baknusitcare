@@ -246,27 +246,35 @@ namespace BaknusITCare.Services
                 {
                     if (string.IsNullOrWhiteSpace(box.Email)) continue;
 
-                    bool isAdmin = box.Tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase) || t.Equals("IT", StringComparison.OrdinalIgnoreCase));
-                    bool isTeknisi = box.Tags.Any(t => t.Equals("Teknisi", StringComparison.OrdinalIgnoreCase) 
-                                                     || t.Equals("StaffIT", StringComparison.OrdinalIgnoreCase)
-                                                     || t.Equals("Support", StringComparison.OrdinalIgnoreCase));
-                    bool isGuru = box.Tags.Any(t => t.Equals("Guru", StringComparison.OrdinalIgnoreCase));
-                    bool isTu = box.Tags.Any(t => t.Equals("TU", StringComparison.OrdinalIgnoreCase) || t.Equals("Tata Usaha", StringComparison.OrdinalIgnoreCase));
-                    bool isSiswa = box.Tags.Any(t => t.Equals("Siswa", StringComparison.OrdinalIgnoreCase) || t.Equals("Murid", StringComparison.OrdinalIgnoreCase));
+                    bool isAdmin = box.Tags.Any(t => t.Contains("admin", StringComparison.OrdinalIgnoreCase) || t.Contains("it", StringComparison.OrdinalIgnoreCase))
+                                   || box.Email.StartsWith("admin", StringComparison.OrdinalIgnoreCase);
 
-                    // Only process accounts with allowed tags or admin
-                    if (!isAdmin && !isTeknisi && !isGuru && !isTu && !isSiswa && !box.Email.StartsWith("admin"))
-                    {
-                        continue;
-                    }
+                    bool isTeknisi = box.Tags.Any(t => t.Contains("teknisi", StringComparison.OrdinalIgnoreCase) 
+                                                     || t.Contains("staffit", StringComparison.OrdinalIgnoreCase)
+                                                     || t.Contains("support", StringComparison.OrdinalIgnoreCase))
+                                     || box.Email.Contains("teknisi", StringComparison.OrdinalIgnoreCase);
+
+                    bool isGuru = box.Tags.Any(t => t.Contains("guru", StringComparison.OrdinalIgnoreCase) || t.Contains("pengajar", StringComparison.OrdinalIgnoreCase))
+                                  || box.Email.StartsWith("guru", StringComparison.OrdinalIgnoreCase);
+
+                    bool isTu = box.Tags.Any(t => t.Contains("tu", StringComparison.OrdinalIgnoreCase) 
+                                               || t.Contains("tata", StringComparison.OrdinalIgnoreCase) 
+                                               || t.Contains("staff", StringComparison.OrdinalIgnoreCase)
+                                               || t.Contains("staf", StringComparison.OrdinalIgnoreCase))
+                                || box.Email.StartsWith("tu", StringComparison.OrdinalIgnoreCase);
+
+                    bool isSiswa = box.Tags.Any(t => t.Contains("siswa", StringComparison.OrdinalIgnoreCase) 
+                                                  || t.Contains("murid", StringComparison.OrdinalIgnoreCase)
+                                                  || t.Contains("kelas", StringComparison.OrdinalIgnoreCase))
+                                   || box.Email.StartsWith("siswa", StringComparison.OrdinalIgnoreCase);
 
                     string targetRole = "Pelapor";
-                    if (isAdmin || box.Email.StartsWith("admin"))
+                    if (isAdmin)
                     {
                         targetRole = "Admin";
                         adminCount++;
                     }
-                    else if (isTeknisi || box.Email.Contains("teknisi"))
+                    else if (isTeknisi)
                     {
                         targetRole = "Teknisi";
                         techCount++;
@@ -277,7 +285,14 @@ namespace BaknusITCare.Services
                         reqCount++;
                     }
 
-                    string tagsString = box.Tags.Any() ? string.Join(", ", box.Tags) : (isGuru ? "Guru" : (isTu ? "TU" : (isSiswa ? "Siswa" : targetRole)));
+                    // Build friendly tag string
+                    var tagParts = new List<string>(box.Tags);
+                    if (isGuru && !tagParts.Any(t => t.Contains("guru", StringComparison.OrdinalIgnoreCase))) tagParts.Add("Guru");
+                    if (isTu && !tagParts.Any(t => t.Contains("tu", StringComparison.OrdinalIgnoreCase))) tagParts.Add("TU");
+                    if (isSiswa && !tagParts.Any(t => t.Contains("siswa", StringComparison.OrdinalIgnoreCase))) tagParts.Add("Siswa");
+                    if (isAdmin && !tagParts.Any(t => t.Contains("admin", StringComparison.OrdinalIgnoreCase))) tagParts.Add("Admin");
+
+                    string tagsString = tagParts.Any() ? string.Join(", ", tagParts.Distinct()) : "Pengguna";
 
                     var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == box.Email.ToLower());
                     if (user == null)
@@ -298,6 +313,7 @@ namespace BaknusITCare.Services
                     else
                     {
                         user.FullName = string.IsNullOrWhiteSpace(box.Name) ? user.FullName : box.Name;
+                        // Preserve appointment as Tim IT if already designated
                         if (user.RoleName != "Teknisi" || isAdmin)
                         {
                             user.RoleName = targetRole;
@@ -309,7 +325,7 @@ namespace BaknusITCare.Services
                 }
 
                 await _dbContext.SaveChangesAsync();
-                return (totalSynced, adminCount, techCount, reqCount, $"Sinkronisasi Mailcow berhasil: {totalSynced} pengguna (Siswa, Guru, TU, Admin) terproses.");
+                return (totalSynced, adminCount, techCount, reqCount, $"Sinkronisasi Mailcow berhasil! {totalSynced} pengguna terambil dari server Mailcow ({adminCount} Admin, {techCount} Teknisi/Tim IT, {reqCount} Guru/TU/Siswa).");
             }
             catch (Exception ex)
             {
@@ -403,7 +419,17 @@ namespace BaknusITCare.Services
                 if (elem.TryGetProperty("username", out var uProp)) email = uProp.GetString() ?? "";
                 else if (elem.TryGetProperty("email", out var eProp)) email = eProp.GetString() ?? "";
 
+                if (!email.Contains('@') && elem.TryGetProperty("domain", out var dProp))
+                {
+                    string dom = dProp.GetString() ?? "";
+                    if (!string.IsNullOrEmpty(dom)) email = $"{email}@{dom}";
+                }
+
                 if (elem.TryGetProperty("name", out var nProp)) name = nProp.GetString() ?? "";
+                if (string.IsNullOrWhiteSpace(name) && elem.TryGetProperty("description", out var descProp))
+                {
+                    name = descProp.GetString() ?? "";
+                }
 
                 if (elem.TryGetProperty("tags", out var tProp))
                 {
@@ -411,12 +437,27 @@ namespace BaknusITCare.Services
                     {
                         foreach (var tag in tProp.EnumerateArray())
                         {
-                            if (tag.ValueKind == JsonValueKind.String) tags.Add(tag.GetString() ?? "");
+                            if (tag.ValueKind == JsonValueKind.String)
+                            {
+                                string t = tag.GetString() ?? "";
+                                if (!string.IsNullOrWhiteSpace(t)) tags.Add(t.Trim());
+                            }
                         }
                     }
                     else if (tProp.ValueKind == JsonValueKind.String)
                     {
-                        tags.Add(tProp.GetString() ?? "");
+                        var raw = tProp.GetString() ?? "";
+                        var split = raw.Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                        tags.AddRange(split);
+                    }
+                }
+
+                if (elem.TryGetProperty("comment", out var cProp) && cProp.ValueKind == JsonValueKind.String)
+                {
+                    string comm = cProp.GetString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(comm))
+                    {
+                        tags.Add(comm.Trim());
                     }
                 }
 

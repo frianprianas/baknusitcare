@@ -13,15 +13,18 @@ namespace BaknusITCare.Services
     {
         private readonly ApplicationDbContext _dbContext;
         private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
         private readonly ILogger<TicketService> _logger;
 
         public TicketService(
             ApplicationDbContext dbContext,
             IEmailService emailService,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
             ILogger<TicketService> logger)
         {
             _dbContext = dbContext;
             _emailService = emailService;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
@@ -137,11 +140,27 @@ namespace BaknusITCare.Services
                 try
                 {
                     ticket.Category = category;
+                    // 1. Kirim email konfirmasi tanda terima ke Pembuat Tiket (Pelapor)
                     await _emailService.SendTicketCreatedConfirmationAsync(ticket);
+
+                    // 2. Ambil seluruh anggota Tim IT (Teknisi) dan Admin untuk dikirimi alert email
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var timItEmails = await db.Users
+                        .Where(u => u.RoleName == "Teknisi" || u.RoleName == "Admin")
+                        .Where(u => !string.IsNullOrEmpty(u.Email))
+                        .Select(u => u.Email)
+                        .Distinct()
+                        .ToListAsync();
+
+                    if (timItEmails.Any())
+                    {
+                        await _emailService.SendNewTicketAlertToTimITAsync(ticket, timItEmails);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Gagal mengirim email auto-responder untuk tiket #{TicketCode}", ticket.TicketCode);
+                    _logger.LogError(ex, "Gagal mengirim email notifikasi tiket #{TicketCode}", ticket.TicketCode);
                 }
             });
 
@@ -224,20 +243,22 @@ namespace BaknusITCare.Services
             await _dbContext.TicketComments.AddAsync(assignComment);
             await _dbContext.SaveChangesAsync();
 
-            if (!string.IsNullOrEmpty(techEmail))
+            _ = Task.Run(async () =>
             {
-                _ = Task.Run(async () =>
+                try
                 {
-                    try
+                    if (!string.IsNullOrEmpty(techEmail))
                     {
                         await _emailService.SendTicketAssignedAsync(ticket, technicianName, techEmail);
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Gagal mengirim email penugasan untuk tiket #{TicketCode}", ticket.TicketCode);
-                    }
-                });
-            }
+                    // Juga kirimkan notifikasi ke Pembuat Tiket (Pelapor) bahwa tiket mulai ditangani
+                    await _emailService.SendTicketStatusUpdatedAsync(ticket, "Baru", "Diproses", $"Tiket telah ditugaskan kepada {technicianName} dan mulai dalam proses penanganan.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Gagal mengirim email penugasan / status untuk tiket #{TicketCode}", ticket.TicketCode);
+                }
+            });
 
             return true;
         }
