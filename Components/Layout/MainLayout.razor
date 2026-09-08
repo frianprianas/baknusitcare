@@ -111,11 +111,6 @@ else
         EnforceAuthentication();
     }
 
-    protected override void OnParametersSet()
-    {
-        EnforceAuthentication();
-    }
-
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         EnforceAuthentication();
@@ -130,10 +125,6 @@ else
         if (!UserSession.IsLoggedIn && path != "login" && !path.StartsWith("login/") && path != "error")
         {
             Navigation.NavigateTo("login");
-        }
-        else if (UserSession.IsLoggedIn && (path == "login" || path.StartsWith("login/")))
-        {
-            Navigation.NavigateTo("");
         }
     }
 

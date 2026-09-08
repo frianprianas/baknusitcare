@@ -110,26 +110,41 @@
     private string? SuccessMessage;
     private bool IsLoading = false;
 
+    protected override void OnInitialized()
+    {
+        if (UserSession.IsLoggedIn)
+        {
+            Navigation.NavigateTo("");
+        }
+    }
+
     private async Task HandleLogin()
     {
         IsLoading = true;
         ErrorMessage = null;
         SuccessMessage = null;
 
-        var result = await MailcowAuth.AuthenticateUserAsync(LoginModel.Email, LoginModel.Password);
-        
-        IsLoading = false;
-
-        if (result.Success && result.User != null)
+        try
         {
-            UserSession.SetUser(result.User);
-            SuccessMessage = $"Selamat datang, {result.User.FullName} ({result.User.RoleName})!";
-            await Task.Delay(800);
-            Navigation.NavigateTo("");
+            var result = await MailcowAuth.AuthenticateUserAsync(LoginModel.Email, LoginModel.Password);
+            
+            if (result.Success && result.User != null)
+            {
+                UserSession.SetUser(result.User);
+                Navigation.NavigateTo("");
+            }
+            else
+            {
+                ErrorMessage = result.Message;
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ErrorMessage = result.Message;
+            ErrorMessage = $"Terjadi kendala saat login: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

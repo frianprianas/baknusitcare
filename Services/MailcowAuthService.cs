@@ -31,155 +31,163 @@ namespace BaknusITCare.Services
 
         public async Task<(bool Success, ApplicationUser? User, string Message)> AuthenticateUserAsync(string email, string password)
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            try
             {
-                return (false, null, "Email dan password wajib diisi.");
-            }
-
-            email = email.Trim().ToLowerInvariant();
-
-            // 1. Check if user exists in local database
-            var existingUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email || u.UserName.ToLower() == email);
-
-            // 2. Validate against Mailcow credentials
-            bool isValidCredentials = false;
-
-            if ((email == "admin@smk.baktinusantara666.sch.id" && password == "buhun666") ||
-                password == "BaknusMail123!" || password == "buhun666")
-            {
-                isValidCredentials = true;
-            }
-            else
-            {
-                // Attempt IMAP validation against Mailcow server
-                try
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
                 {
-                    string imapHost = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
-                    using var client = new ImapClient();
-                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                    await client.ConnectAsync(imapHost, 993, true);
-                    await client.AuthenticateAsync(email, password);
-                    if (client.IsAuthenticated)
+                    return (false, null, "Email dan password wajib diisi.");
+                }
+
+                email = email.Trim().ToLowerInvariant();
+
+                // 1. Check if user exists in local database
+                var existingUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email || u.UserName.ToLower() == email);
+
+                // 2. Validate against Mailcow credentials
+                bool isValidCredentials = false;
+
+                if ((email == "admin@smk.baktinusantara666.sch.id" && password == "buhun666") ||
+                    password == "BaknusMail123!" || password == "buhun666")
+                {
+                    isValidCredentials = true;
+                }
+                else
+                {
+                    // Attempt IMAP validation against Mailcow server
+                    try
                     {
-                        isValidCredentials = true;
-                        await client.DisconnectAsync(true);
+                        string imapHost = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
+                        using var client = new ImapClient();
+                        client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                        await client.ConnectAsync(imapHost, 993, true);
+                        await client.AuthenticateAsync(email, password);
+                        if (client.IsAuthenticated)
+                        {
+                            isValidCredentials = true;
+                            await client.DisconnectAsync(true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Penetapan autentikasi IMAP ke Mailcow gagal untuk {Email}, mencoba fallback database.", email);
+                        if (existingUser != null && (password == "buhun666" || password == "BaknusMail123!"))
+                        {
+                            isValidCredentials = true;
+                        }
                     }
                 }
-                catch (Exception ex)
+
+                if (!isValidCredentials)
                 {
-                    _logger.LogWarning(ex, "Penetapan autentikasi IMAP ke Mailcow gagal untuk {Email}, mencoba fallback database.", email);
-                    if (existingUser != null && (password == "buhun666" || password == "BaknusMail123!"))
+                    return (false, null, "Email atau Password Mailcow tidak valid.");
+                }
+
+                // 3. Fetch tags from Mailcow API or local DB
+                List<string> tags = new();
+                string? mailboxName = null;
+
+                var mailboxInfo = await GetMailboxFromApiAsync(email);
+                if (mailboxInfo != null)
+                {
+                    tags = mailboxInfo.Tags;
+                    mailboxName = mailboxInfo.Name;
+                }
+                else if (existingUser != null && !string.IsNullOrWhiteSpace(existingUser.DepartmentOrClass))
+                {
+                    tags = existingUser.DepartmentOrClass
+                        .Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                        .ToList();
+                }
+
+                // Master account bypass
+                bool isMasterAdmin = email == "admin@smk.baktinusantara666.sch.id";
+                if (isMasterAdmin && !tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
+                {
+                    tags.Add("Admin");
+                }
+
+                // 4. Validate TAG requirement (Must have Siswa, Guru, TU, or Admin)
+                bool hasAdminTag = tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase) || t.Equals("IT", StringComparison.OrdinalIgnoreCase));
+                bool hasGuruTag = tags.Any(t => t.Equals("Guru", StringComparison.OrdinalIgnoreCase));
+                bool hasTuTag = tags.Any(t => t.Equals("TU", StringComparison.OrdinalIgnoreCase) || t.Equals("Tata Usaha", StringComparison.OrdinalIgnoreCase));
+                bool hasSiswaTag = tags.Any(t => t.Equals("Siswa", StringComparison.OrdinalIgnoreCase) || t.Equals("Murid", StringComparison.OrdinalIgnoreCase));
+                bool hasTeknisiTag = tags.Any(t => t.Equals("Teknisi", StringComparison.OrdinalIgnoreCase) || t.Equals("StaffIT", StringComparison.OrdinalIgnoreCase));
+
+                if (!isMasterAdmin && !hasAdminTag && !hasGuruTag && !hasTuTag && !hasSiswaTag && !hasTeknisiTag)
+                {
+                    return (false, null, "Akses ditolak: Akun Mailcow Anda tidak memiliki TAG (Siswa, Guru, TU, atau Admin) yang diizinkan untuk mengakses BaknusITCare.");
+                }
+
+                // 5. Determine Role & Tag Label
+                string role = "Pelapor";
+                string primaryTag = "Pelapor";
+
+                if (hasAdminTag || isMasterAdmin)
+                {
+                    role = "Admin";
+                    primaryTag = "Admin";
+                }
+                else if (hasTeknisiTag)
+                {
+                    role = "Teknisi";
+                    primaryTag = "Teknisi";
+                }
+                else if (hasGuruTag)
+                {
+                    role = "Pelapor";
+                    primaryTag = "Guru";
+                }
+                else if (hasTuTag)
+                {
+                    role = "Pelapor";
+                    primaryTag = "TU";
+                }
+                else if (hasSiswaTag)
+                {
+                    role = "Pelapor";
+                    primaryTag = "Siswa";
+                }
+
+                string tagsCombined = tags.Any() ? string.Join(", ", tags) : primaryTag;
+
+                // 6. Create or update user
+                if (existingUser == null)
+                {
+                    existingUser = new ApplicationUser
                     {
-                        isValidCredentials = true;
+                        Id = Guid.NewGuid().ToString(),
+                        UserName = email,
+                        Email = email,
+                        FullName = !string.IsNullOrWhiteSpace(mailboxName) ? mailboxName : GetNameFromEmail(email),
+                        RoleName = role,
+                        DepartmentOrClass = tagsCombined,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        LastLoginAt = DateTime.UtcNow
+                    };
+
+                    await _dbContext.Users.AddAsync(existingUser);
+                    await _dbContext.SaveChangesAsync();
+                }
+                else
+                {
+                    existingUser.RoleName = role;
+                    existingUser.DepartmentOrClass = tagsCombined;
+                    if (!string.IsNullOrWhiteSpace(mailboxName))
+                    {
+                        existingUser.FullName = mailboxName;
                     }
+                    existingUser.LastLoginAt = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
                 }
-            }
 
-            if (!isValidCredentials)
-            {
-                return (false, null, "Email atau Password Mailcow tidak valid.");
+                return (true, existingUser, "Login berhasil.");
             }
-
-            // 3. Fetch tags from Mailcow API or local DB
-            List<string> tags = new();
-            string? mailboxName = null;
-
-            var mailboxInfo = await GetMailboxFromApiAsync(email);
-            if (mailboxInfo != null)
+            catch (Exception ex)
             {
-                tags = mailboxInfo.Tags;
-                mailboxName = mailboxInfo.Name;
+                _logger.LogError(ex, "Terjadi kesalahan saat memproses login untuk {Email}", email);
+                return (false, null, $"Terjadi kendala pada database/sistem: {ex.Message}");
             }
-            else if (existingUser != null && !string.IsNullOrWhiteSpace(existingUser.DepartmentOrClass))
-            {
-                tags = existingUser.DepartmentOrClass
-                    .Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                    .ToList();
-            }
-
-            // Master account bypass
-            bool isMasterAdmin = email == "admin@smk.baktinusantara666.sch.id";
-            if (isMasterAdmin && !tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
-            {
-                tags.Add("Admin");
-            }
-
-            // 4. Validate TAG requirement (Must have Siswa, Guru, TU, or Admin)
-            bool hasAdminTag = tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase) || t.Equals("IT", StringComparison.OrdinalIgnoreCase));
-            bool hasGuruTag = tags.Any(t => t.Equals("Guru", StringComparison.OrdinalIgnoreCase));
-            bool hasTuTag = tags.Any(t => t.Equals("TU", StringComparison.OrdinalIgnoreCase) || t.Equals("Tata Usaha", StringComparison.OrdinalIgnoreCase));
-            bool hasSiswaTag = tags.Any(t => t.Equals("Siswa", StringComparison.OrdinalIgnoreCase) || t.Equals("Murid", StringComparison.OrdinalIgnoreCase));
-            bool hasTeknisiTag = tags.Any(t => t.Equals("Teknisi", StringComparison.OrdinalIgnoreCase) || t.Equals("StaffIT", StringComparison.OrdinalIgnoreCase));
-
-            if (!isMasterAdmin && !hasAdminTag && !hasGuruTag && !hasTuTag && !hasSiswaTag && !hasTeknisiTag)
-            {
-                return (false, null, "Akses ditolak: Akun Mailcow Anda tidak memiliki TAG (Siswa, Guru, TU, atau Admin) yang diizinkan untuk mengakses BaknusITCare.");
-            }
-
-            // 5. Determine Role & Tag Label
-            string role = "Pelapor";
-            string primaryTag = "Pelapor";
-
-            if (hasAdminTag || isMasterAdmin)
-            {
-                role = "Admin";
-                primaryTag = "Admin";
-            }
-            else if (hasTeknisiTag)
-            {
-                role = "Teknisi";
-                primaryTag = "Teknisi";
-            }
-            else if (hasGuruTag)
-            {
-                role = "Pelapor";
-                primaryTag = "Guru";
-            }
-            else if (hasTuTag)
-            {
-                role = "Pelapor";
-                primaryTag = "TU";
-            }
-            else if (hasSiswaTag)
-            {
-                role = "Pelapor";
-                primaryTag = "Siswa";
-            }
-
-            string tagsCombined = tags.Any() ? string.Join(", ", tags) : primaryTag;
-
-            // 6. Create or update user
-            if (existingUser == null)
-            {
-                existingUser = new ApplicationUser
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    UserName = email,
-                    Email = email,
-                    FullName = !string.IsNullOrWhiteSpace(mailboxName) ? mailboxName : GetNameFromEmail(email),
-                    RoleName = role,
-                    DepartmentOrClass = tagsCombined,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    LastLoginAt = DateTime.UtcNow
-                };
-
-                await _dbContext.Users.AddAsync(existingUser);
-                await _dbContext.SaveChangesAsync();
-            }
-            else
-            {
-                existingUser.RoleName = role;
-                existingUser.DepartmentOrClass = tagsCombined;
-                if (!string.IsNullOrWhiteSpace(mailboxName))
-                {
-                    existingUser.FullName = mailboxName;
-                }
-                existingUser.LastLoginAt = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
-            }
-
-            return (true, existingUser, "Login berhasil.");
         }
 
         public async Task<(int TotalSynced, int AdminCount, int TechnicianCount, int RequesterCount, string Message)> SyncMailcowUsersAsync()
