@@ -180,20 +180,34 @@
                             </label>
                             <select class="form-select form-select-lg bg-white" @bind="SelectedLocation">
                                 <option value="">-- Pilih Ruangan Kejadian Kendala --</option>
-                                <option value="Lab Komputer 1 (Lantai 1)">Lab Komputer 1 (Lantai 1)</option>
-                                <option value="Lab Komputer 2 (Lantai 2)">Lab Komputer 2 (Lantai 2)</option>
-                                <option value="Lab Komputer 3 (Lantai 2)">Lab Komputer 3 (Lantai 2)</option>
-                                <option value="Lab Komputer 4 (Lantai 3)">Lab Komputer 4 (Lantai 3)</option>
-                                <option value="Ruang Guru (Lantai 1)">Ruang Guru (Lantai 1)</option>
-                                <option value="Ruang Tata Usaha (TU)">Ruang Tata Usaha (TU)</option>
-                                <option value="Ruang Kepala Sekolah & Rapat">Ruang Kepala Sekolah & Rapat</option>
-                                <option value="Kelas X (Gedung A)">Kelas X (Gedung A)</option>
-                                <option value="Kelas XI (Gedung B)">Kelas XI (Gedung B)</option>
-                                <option value="Kelas XII (Gedung C)">Kelas XII (Gedung C)</option>
-                                <option value="Perpustakaan Digital">Perpustakaan Digital</option>
-                                <option value="Aula / Lapangan Utama">Aula / Lapangan Utama</option>
-                                <option value="Ruang Lainnya">Ruang Lainnya</option>
+                                <option value="Ruang Workshop">Ruang Workshop</option>
+                                <option value="Ruang Kepsek">Ruang Kepsek</option>
+                                <option value="Ruang Bahagian">Ruang Bahagian</option>
+                                <option value="Wifi lantai 1">Wifi lantai 1</option>
+                                <option value="Ruang BK">Ruang BK</option>
+                                <option value="Ruang Guru">Ruang Guru</option>
+                                <option value="Wifi lantai 2 Timur (deket lab AKT)">Wifi lantai 2 Timur (deket lab AKT)</option>
+                                <option value="Wifi lantai 2 Barat">Wifi lantai 2 Barat</option>
+                                <option value="Wifi lantai 2 Selatan">Wifi lantai 2 Selatan</option>
+                                <option value="Lab Akuntansi">Lab Akuntansi</option>
+                                <option value="Ruang TU Keuangan">Ruang TU Keuangan</option>
+                                <option value="Ruang Perpustakaan">Ruang Perpustakaan</option>
+                                <option value="Lab Animasi">Lab Animasi</option>
+                                <option value="Lab DKV">Lab DKV</option>
+                                <option value="Ruang TU">Ruang TU</option>
+                                <option value="Lab PK lantai 1">Lab PK lantai 1</option>
+                                <option value="Lab PK lantai 2">Lab PK lantai 2</option>
+                                <option value="Lab PK Lantai 3">Lab PK Lantai 3</option>
+                                <option value="Ruang Photografi">Ruang Photografi</option>
+                                <option value="Lab Pemasaran">Lab Pemasaran</option>
+                                <option value="Lainnya">Lainnya</option>
                             </select>
+                            @if (SelectedLocation == "Lainnya")
+                            {
+                                <div class="mt-2">
+                                    <input type="text" class="form-control bg-white" placeholder="Tuliskan nama ruangan / lokasi lainnya..." @bind="CustomLocation" />
+                                </div>
+                            }
                         </div>
 
                         <!-- Keluhan Kendala Internet (Wajib untuk Internet) -->
@@ -325,6 +339,7 @@
     private string SelectedServiceType = "Internet"; // "Internet" or "BaknusID"
     private string InternetSubIssue = "Internet tidak terkoneksi";
     private string SelectedLocation = "";
+    private string CustomLocation = "";
     private string ComplaintDescription = "";
 
     private string BaknusIdApp = "WebsiteBaknus";
@@ -405,10 +420,14 @@
                 Status = TicketStatus.Baru
             };
 
+            string finalLocation = SelectedLocation == "Lainnya" && !string.IsNullOrWhiteSpace(CustomLocation)
+                ? $"Lainnya ({CustomLocation.Trim()})"
+                : SelectedLocation;
+
             if (SelectedServiceType == "Internet")
             {
-                ticketToCreate.Title = $"[Internet] {InternetSubIssue} di {SelectedLocation}";
-                ticketToCreate.Location = SelectedLocation;
+                ticketToCreate.Title = $"[Internet] {InternetSubIssue} di {finalLocation}";
+                ticketToCreate.Location = finalLocation;
                 ticketToCreate.Description = ComplaintDescription.Trim();
             }
             else
