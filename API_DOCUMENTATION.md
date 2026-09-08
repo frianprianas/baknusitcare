@@ -95,7 +95,48 @@ Dokumentasi ini dibuat sebagai panduan teknis bagi pengembang aplikasi mobile (*
 
 ---
 
-## 🎫 3. Manajemen Tiket (`/api/tickets`)
+## 👨‍💻 3. Petugas IT & Teknisi Terpilih (`/api/technicians`)
+
+### 3.1. Ambil Daftar Petugas IT yang Ditunjuk Admin
+* **Endpoint**: `GET /api/technicians`
+* **Query Parameters**:
+  - `includeAdmins` (opsional, boolean, default: `true`): Menyertakan Administrator IT.
+* **Deskripsi**: Mengambil daftar seluruh staf Guru/TU yang telah ditunjuk dan diberi wewenang oleh Admin sebagai Anggota Tim IT (Teknisi) untuk menangani keluhan IT, lengkap dengan statistik tiket yang sedang/telah ditangani.
+* **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Ditemukan 3 Petugas IT yang telah ditunjuk.",
+    "data": [
+      {
+        "id": "7697dd5c-e5ff-4ab3-bf58-963dbab3cf32",
+        "fullName": "Frian P",
+        "email": "frian_p@smk.baktinusantara666.sch.id",
+        "phoneNumber": "08123456789",
+        "role": "Teknisi",
+        "roleLabel": "Petugas IT (Teknisi)",
+        "department": "Guru",
+        "activeTicketsHandled": 2,
+        "totalResolvedTickets": 14
+      },
+      {
+        "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+        "fullName": "Admin IT Support",
+        "email": "admin@smk.baktinusantara666.sch.id",
+        "phoneNumber": "-",
+        "role": "Admin",
+        "roleLabel": "Administrator IT",
+        "department": "Admin",
+        "activeTicketsHandled": 1,
+        "totalResolvedTickets": 28
+      }
+    ]
+  }
+  ```
+
+---
+
+## 🎫 4. Manajemen Tiket (`/api/tickets`)
 
 ### 3.1. Ambil Daftar Tiket
 * **Endpoint**: `GET /api/tickets`
