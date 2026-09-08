@@ -127,7 +127,7 @@ namespace BaknusITCare.Services
             return anySuccess;
         }
 
-        public async Task<bool> SendTicketStatusUpdatedAsync(Ticket ticket, string oldStatus, string newStatus, string? commentMessage = null)
+        public async Task<bool> SendTicketStatusUpdatedAsync(Ticket ticket, string oldStatus, string newStatus, string? commentMessage = null, System.Collections.Generic.List<string>? additionalRecipients = null)
         {
             string subject = newStatus switch
             {
@@ -158,10 +158,10 @@ namespace BaknusITCare.Services
 
             string statusDescription = newStatus switch
             {
-                "Diproses" => $"Laporan kendala IT Anda saat ini <strong>SEDANG DITANGANI</strong> oleh petugas Tim IT (<strong>{ticket.AssignedTechnicianName ?? "Petugas Tim IT"}</strong>). Petugas sedang memeriksa sistem atau menuju lokasi ruangan.",
-                "Selesai" => $"Kabar baik! Laporan kendala IT Anda telah <strong>BERHASIL DIPERBAIKI / SELESAI</strong>. Silakan periksa kembali perangkat/layanan Anda.",
+                "Diproses" => $"Laporan kendala IT saat ini <strong>SEDANG DITANGANI</strong> oleh petugas Tim IT (<strong>{ticket.AssignedTechnicianName ?? "Petugas Tim IT"}</strong>). Petugas sedang memeriksa sistem atau menuju lokasi.",
+                "Selesai" => $"Kabar baik! Laporan kendala IT telah <strong>BERHASIL DIPERBAIKI / SELESAI</strong>. Silakan periksa kembali perangkat/layanan Anda.",
                 "MenungguSparepart" => "Petugas telah melakukan pemeriksaan awal, dan penanganan memerlukan penggantian sparepart atau koordinasi vendor luar.",
-                _ => $"Status laporan Anda telah diperbarui dari <strong>{oldStatus}</strong> menjadi <strong>{newStatus}</strong>."
+                _ => $"Status laporan telah diperbarui dari <strong>{oldStatus}</strong> menjadi <strong>{newStatus}</strong>."
             };
 
             string extraNotice = newStatus == "Selesai" 
@@ -175,14 +175,14 @@ namespace BaknusITCare.Services
                 : "";
 
             string commentBlock = !string.IsNullOrWhiteSpace(commentMessage)
-                ? $"<div style=\"background: #f0f4f8; border-left: 4px solid #0078d4; padding: 12px 16px; margin: 15px 0; border-radius: 4px;\"><strong style=\"color: #0078d4;\">Pesan / Catatan dari Petugas IT ({ticket.AssignedTechnicianName ?? "Tim IT Support"}):</strong><p style=\"margin: 6px 0 0 0; color: #333;\">{commentMessage}</p></div>"
+                ? $"<div style=\"background: #f0f4f8; border-left: 4px solid #0078d4; padding: 12px 16px; margin: 15px 0; border-radius: 4px;\"><strong style=\"color: #0078d4;\">Catatan dari Petugas IT ({ticket.AssignedTechnicianName ?? "Tim IT Support"}):</strong><p style=\"margin: 6px 0 0 0; color: #333;\">{commentMessage}</p></div>"
                 : "";
 
             string bodyHtml = $@"
 <div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; padding: 30px 15px;"">
     <div style=""max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-top: 5px solid {statusBadgeColor};"">
         <div style=""padding: 24px; background-color: #0078d4; color: #ffffff;"">
-            <h2 style=""margin: 0; font-size: 20px; font-weight: 600;"">BaknusITCare - Update Status Penanganan</h2>
+            <h2 style=""margin: 0; font-size: 20px; font-weight: 600;"">BaknusITCare - Update Perkembangan Status</h2>
             <p style=""margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;"">Laporan IT #{ticket.TicketCode} - {ticket.Title}</p>
         </div>
         <div style=""padding: 24px; color: #333333;"">
@@ -224,7 +224,20 @@ namespace BaknusITCare.Services
     </div>
 </div>";
 
-            return await SendEmailAsync(ticket.RequesterEmail, subject, bodyHtml);
+            // 1. Kirim ke Pembuat Tiket (Pelapor)
+            bool reqResult = await SendEmailAsync(ticket.RequesterEmail, subject, bodyHtml);
+
+            // 2. Kirim juga tembusan update ke Tim IT jika disediakan
+            if (additionalRecipients != null && additionalRecipients.Any())
+            {
+                foreach (var recipient in additionalRecipients)
+                {
+                    if (string.IsNullOrWhiteSpace(recipient) || recipient.Equals(ticket.RequesterEmail, StringComparison.OrdinalIgnoreCase)) continue;
+                    await SendEmailAsync(recipient.Trim(), subject, bodyHtml);
+                }
+            }
+
+            return reqResult;
         }
 
         public async Task<bool> SendTicketAssignedAsync(Ticket ticket, string technicianName, string technicianEmail)
@@ -271,36 +284,71 @@ namespace BaknusITCare.Services
 
         private async Task<bool> SendEmailAsync(string recipientEmail, string subject, string bodyHtml)
         {
-            try
+            if (string.IsNullOrWhiteSpace(recipientEmail)) return false;
+
+            string host = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
+            int port = int.TryParse(_config["Mailcow:SmtpPort"], out var p) ? p : 587;
+            string username = _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
+            string password = _config["Mailcow:SmtpPassword"] ?? "buhun666";
+            string senderName = _config["Mailcow:SenderName"] ?? "BaknusITCare - Layanan IT Sekolah";
+
+            if (!MailboxAddress.TryParse(recipientEmail.Trim(), out var toAddress))
             {
-                string host = _config["Mailcow:SmtpHost"] ?? "mail.smk.baktinusantara666.sch.id";
-                int port = int.TryParse(_config["Mailcow:SmtpPort"], out var p) ? p : 587;
-                string username = _config["Mailcow:SmtpUsername"] ?? "admin@smk.baktinusantara666.sch.id";
-                string password = _config["Mailcow:SmtpPassword"] ?? "buhun666";
-                string senderName = _config["Mailcow:SenderName"] ?? "BaknusITCare - Layanan IT Sekolah";
-
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(senderName, username));
-                message.To.Add(MailboxAddress.Parse(recipientEmail));
-                message.Subject = subject;
-                message.Body = new TextPart(TextFormat.Html) { Text = bodyHtml };
-
-                using var smtp = new SmtpClient();
-                smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-                await smtp.ConnectAsync(host, port, SecureSocketOptions.StartTlsWhenAvailable);
-                await smtp.AuthenticateAsync(username, password);
-                await smtp.SendAsync(message);
-                await smtp.DisconnectAsync(true);
-
-                _logger.LogInformation("Berhasil mengirim email penugasan ke {Recipient} dengan subjek '{Subject}'", recipientEmail, subject);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Gagal mengirim email penugasan ke {Recipient}", recipientEmail);
+                _logger.LogWarning("Format email penerima '{Recipient}' tidak valid, pengiriman dibatalkan.", recipientEmail);
                 return false;
             }
+
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(senderName, username));
+            message.To.Add(toAddress);
+            message.Subject = subject;
+            message.Body = new TextPart(TextFormat.Html) { Text = bodyHtml };
+
+            // Daftar target koneksi SMTP bertingkat untuk memastikan pengiriman selalu tembus:
+            // 1. Port 587 dengan STARTTLS wajib (standar Mailcow)
+            // 2. Port 465 dengan SSL/TLS langsung
+            // 3. Port 587 dengan StartTlsWhenAvailable
+            // 4. host.docker.internal (menembus bridge Docker ke host Ubuntu)
+            // 5. IP Gateway Docker 172.17.0.1
+            var connectionTargets = new (string Host, int Port, SecureSocketOptions Sec)[]
+            {
+                (host, port, SecureSocketOptions.StartTls),
+                (host, 465, SecureSocketOptions.SslOnConnect),
+                (host, 587, SecureSocketOptions.StartTlsWhenAvailable),
+                ("host.docker.internal", 587, SecureSocketOptions.StartTls),
+                ("172.17.0.1", 587, SecureSocketOptions.StartTls),
+                (host, 25, SecureSocketOptions.StartTlsWhenAvailable)
+            };
+
+            Exception? lastEx = null;
+            foreach (var target in connectionTargets)
+            {
+                try
+                {
+                    using var smtp = new SmtpClient();
+                    smtp.Timeout = 8000; // 8 detik per endpoint agar tidak membekukan sistem
+                    smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                    smtp.CheckCertificateRevocation = false;
+
+                    await smtp.ConnectAsync(target.Host, target.Port, target.Sec);
+                    smtp.AuthenticationMechanisms.Remove("XOAUTH2");
+                    await smtp.AuthenticateAsync(username, password);
+                    await smtp.SendAsync(message);
+                    await smtp.DisconnectAsync(true);
+
+                    _logger.LogInformation("SUKSES: Email terkirim ke {Recipient} via {Host}:{Port} [{Subject}]", recipientEmail, target.Host, target.Port, subject);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    lastEx = ex;
+                    _logger.LogWarning("Info: Percobaan SMTP ke {Host}:{Port} ({Error}). Mencoba jalur berikutnya...", target.Host, target.Port, ex.Message);
+                }
+            }
+
+            _logger.LogError(lastEx, "GAGAL TOTAL: Tidak dapat mengirim email ke {Recipient} setelah mencoba seluruh jalur koneksi SMTP.", recipientEmail);
+            return false;
         }
     }
 }
+

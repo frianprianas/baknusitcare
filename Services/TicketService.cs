@@ -164,28 +164,54 @@ namespace BaknusITCare.Services
             {
                 try
                 {
-                    ticket.Category = category;
-                    // 1. Kirim email konfirmasi tanda terima ke Pembuat Tiket (Pelapor)
-                    await _emailService.SendTicketCreatedConfirmationAsync(ticket);
-
-                    // 2. Ambil seluruh anggota Tim IT (Teknisi) dan Admin untuk dikirimi alert email
                     using var scope = _scopeFactory.CreateScope();
+                    var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var timItEmails = await db.Users
-                        .Where(u => u.RoleName == "Teknisi" || u.RoleName == "Admin")
-                        .Where(u => !string.IsNullOrEmpty(u.Email))
-                        .Select(u => u.Email)
-                        .Distinct()
-                        .ToListAsync();
 
-                    if (timItEmails.Any())
+                    // Siapkan daftar email Tim IT & Administrator
+                    var timItEmails = new List<string>();
+                    try
                     {
-                        await _emailService.SendNewTicketAlertToTimITAsync(ticket, timItEmails);
+                        timItEmails = await db.Users
+                            .Where(u => u.RoleName == "Teknisi" || u.RoleName == "Admin")
+                            .Where(u => !string.IsNullOrEmpty(u.Email))
+                            .Select(u => u.Email)
+                            .Distinct()
+                            .ToListAsync();
+                    }
+                    catch { }
+
+                    // Selalu pastikan admin master masuk dalam daftar penerima notifikasi IT
+                    string masterAdmin = "admin@smk.baktinusantara666.sch.id";
+                    if (!timItEmails.Any(e => e.Equals(masterAdmin, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        timItEmails.Add(masterAdmin);
+                    }
+
+                    // 1. Kirim email konfirmasi tanda terima ke Pembuat Tiket (Pelapor)
+                    try
+                    {
+                        ticket.Category = category;
+                        await emailSvc.SendTicketCreatedConfirmationAsync(ticket);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Gagal mengirim email konfirmasi ke pembuat tiket #{TicketCode}", ticket.TicketCode);
+                    }
+
+                    // 2. Kirim email alert ke seluruh Petugas Tim IT (Teknisi & Admin)
+                    try
+                    {
+                        await emailSvc.SendNewTicketAlertToTimITAsync(ticket, timItEmails);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Gagal mengirim email alert tiket #{TicketCode} ke Tim IT", ticket.TicketCode);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Gagal mengirim email notifikasi tiket #{TicketCode}", ticket.TicketCode);
+                    _logger.LogError(ex, "Gagal memproses pengiriman background email tiket #{TicketCode}", ticket.TicketCode);
                 }
             });
 
@@ -226,7 +252,30 @@ namespace BaknusITCare.Services
             {
                 try
                 {
-                    await _emailService.SendTicketStatusUpdatedAsync(ticket, oldStatusStr, newStatus.ToString(), comment);
+                    using var scope = _scopeFactory.CreateScope();
+                    var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                    var timItEmails = new List<string>();
+                    try
+                    {
+                        timItEmails = await db.Users
+                            .Where(u => u.RoleName == "Teknisi" || u.RoleName == "Admin")
+                            .Where(u => !string.IsNullOrEmpty(u.Email))
+                            .Select(u => u.Email)
+                            .Distinct()
+                            .ToListAsync();
+                    }
+                    catch { }
+
+                    string masterAdmin = "admin@smk.baktinusantara666.sch.id";
+                    if (!timItEmails.Any(e => e.Equals(masterAdmin, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        timItEmails.Add(masterAdmin);
+                    }
+
+                    // Kirim ke pembuat tiket dan seluruh Tim IT
+                    await emailSvc.SendTicketStatusUpdatedAsync(ticket, oldStatusStr, newStatus.ToString(), comment, timItEmails);
                 }
                 catch (Exception ex)
                 {
@@ -272,12 +321,15 @@ namespace BaknusITCare.Services
             {
                 try
                 {
+                    using var scope = _scopeFactory.CreateScope();
+                    var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
                     if (!string.IsNullOrEmpty(techEmail))
                     {
-                        await _emailService.SendTicketAssignedAsync(ticket, technicianName, techEmail);
+                        await emailSvc.SendTicketAssignedAsync(ticket, technicianName, techEmail);
                     }
                     // Juga kirimkan notifikasi ke Pembuat Tiket (Pelapor) bahwa tiket mulai ditangani
-                    await _emailService.SendTicketStatusUpdatedAsync(ticket, "Baru", "Diproses", $"Tiket telah ditugaskan kepada {technicianName} dan mulai dalam proses penanganan.");
+                    await emailSvc.SendTicketStatusUpdatedAsync(ticket, "Baru", "Diproses", $"Tiket telah ditugaskan kepada {technicianName} dan mulai dalam proses penanganan.");
                 }
                 catch (Exception ex)
                 {
