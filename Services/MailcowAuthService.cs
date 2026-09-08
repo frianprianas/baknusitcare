@@ -80,27 +80,85 @@ namespace BaknusITCare.Services
                 return (false, null, "Email atau Password Mailcow tidak valid.");
             }
 
-            // 3. Create or update user
+            // 3. Fetch tags from Mailcow API or local DB
+            List<string> tags = new();
+            string? mailboxName = null;
+
+            var mailboxInfo = await GetMailboxFromApiAsync(email);
+            if (mailboxInfo != null)
+            {
+                tags = mailboxInfo.Tags;
+                mailboxName = mailboxInfo.Name;
+            }
+            else if (existingUser != null && !string.IsNullOrWhiteSpace(existingUser.DepartmentOrClass))
+            {
+                tags = existingUser.DepartmentOrClass
+                    .Split(new[] { ',', ';' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .ToList();
+            }
+
+            // Master account bypass
+            bool isMasterAdmin = email == "admin@smk.baktinusantara666.sch.id";
+            if (isMasterAdmin && !tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                tags.Add("Admin");
+            }
+
+            // 4. Validate TAG requirement (Must have Siswa, Guru, TU, or Admin)
+            bool hasAdminTag = tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase) || t.Equals("IT", StringComparison.OrdinalIgnoreCase));
+            bool hasGuruTag = tags.Any(t => t.Equals("Guru", StringComparison.OrdinalIgnoreCase));
+            bool hasTuTag = tags.Any(t => t.Equals("TU", StringComparison.OrdinalIgnoreCase) || t.Equals("Tata Usaha", StringComparison.OrdinalIgnoreCase));
+            bool hasSiswaTag = tags.Any(t => t.Equals("Siswa", StringComparison.OrdinalIgnoreCase) || t.Equals("Murid", StringComparison.OrdinalIgnoreCase));
+            bool hasTeknisiTag = tags.Any(t => t.Equals("Teknisi", StringComparison.OrdinalIgnoreCase) || t.Equals("StaffIT", StringComparison.OrdinalIgnoreCase));
+
+            if (!isMasterAdmin && !hasAdminTag && !hasGuruTag && !hasTuTag && !hasSiswaTag && !hasTeknisiTag)
+            {
+                return (false, null, "Akses ditolak: Akun Mailcow Anda tidak memiliki TAG (Siswa, Guru, TU, atau Admin) yang diizinkan untuk mengakses BaknusITCare.");
+            }
+
+            // 5. Determine Role & Tag Label
+            string role = "Pelapor";
+            string primaryTag = "Pelapor";
+
+            if (hasAdminTag || isMasterAdmin)
+            {
+                role = "Admin";
+                primaryTag = "Admin";
+            }
+            else if (hasTeknisiTag)
+            {
+                role = "Teknisi";
+                primaryTag = "Teknisi";
+            }
+            else if (hasGuruTag)
+            {
+                role = "Pelapor";
+                primaryTag = "Guru";
+            }
+            else if (hasTuTag)
+            {
+                role = "Pelapor";
+                primaryTag = "TU";
+            }
+            else if (hasSiswaTag)
+            {
+                role = "Pelapor";
+                primaryTag = "Siswa";
+            }
+
+            string tagsCombined = tags.Any() ? string.Join(", ", tags) : primaryTag;
+
+            // 6. Create or update user
             if (existingUser == null)
             {
-                string role = "Pelapor";
-                if (email.Contains("admin") || email.Contains("it"))
-                {
-                    role = "Admin";
-                }
-                else if (email.Contains("teknisi"))
-                {
-                    role = "Teknisi";
-                }
-
                 existingUser = new ApplicationUser
                 {
                     Id = Guid.NewGuid().ToString(),
                     UserName = email,
                     Email = email,
-                    FullName = GetNameFromEmail(email),
+                    FullName = !string.IsNullOrWhiteSpace(mailboxName) ? mailboxName : GetNameFromEmail(email),
                     RoleName = role,
-                    DepartmentOrClass = role == "Admin" ? "Admin, Mailcow" : "Guru, TU",
+                    DepartmentOrClass = tagsCombined,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     LastLoginAt = DateTime.UtcNow
@@ -111,6 +169,12 @@ namespace BaknusITCare.Services
             }
             else
             {
+                existingUser.RoleName = role;
+                existingUser.DepartmentOrClass = tagsCombined;
+                if (!string.IsNullOrWhiteSpace(mailboxName))
+                {
+                    existingUser.FullName = mailboxName;
+                }
                 existingUser.LastLoginAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
             }
@@ -171,12 +235,21 @@ namespace BaknusITCare.Services
                 {
                     if (string.IsNullOrWhiteSpace(box.Email)) continue;
 
-                    string targetRole = "Pelapor";
                     bool isAdmin = box.Tags.Any(t => t.Equals("Admin", StringComparison.OrdinalIgnoreCase) || t.Equals("IT", StringComparison.OrdinalIgnoreCase));
                     bool isTeknisi = box.Tags.Any(t => t.Equals("Teknisi", StringComparison.OrdinalIgnoreCase) 
                                                      || t.Equals("StaffIT", StringComparison.OrdinalIgnoreCase)
                                                      || t.Equals("Support", StringComparison.OrdinalIgnoreCase));
-                    
+                    bool isGuru = box.Tags.Any(t => t.Equals("Guru", StringComparison.OrdinalIgnoreCase));
+                    bool isTu = box.Tags.Any(t => t.Equals("TU", StringComparison.OrdinalIgnoreCase) || t.Equals("Tata Usaha", StringComparison.OrdinalIgnoreCase));
+                    bool isSiswa = box.Tags.Any(t => t.Equals("Siswa", StringComparison.OrdinalIgnoreCase) || t.Equals("Murid", StringComparison.OrdinalIgnoreCase));
+
+                    // Only process accounts with allowed tags or admin
+                    if (!isAdmin && !isTeknisi && !isGuru && !isTu && !isSiswa && !box.Email.StartsWith("admin"))
+                    {
+                        continue;
+                    }
+
+                    string targetRole = "Pelapor";
                     if (isAdmin || box.Email.StartsWith("admin"))
                     {
                         targetRole = "Admin";
@@ -193,7 +266,7 @@ namespace BaknusITCare.Services
                         reqCount++;
                     }
 
-                    string tagsString = box.Tags.Any() ? string.Join(", ", box.Tags) : "Guru, TU";
+                    string tagsString = box.Tags.Any() ? string.Join(", ", box.Tags) : (isGuru ? "Guru" : (isTu ? "TU" : (isSiswa ? "Siswa" : targetRole)));
 
                     var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == box.Email.ToLower());
                     if (user == null)
@@ -222,13 +295,87 @@ namespace BaknusITCare.Services
                 }
 
                 await _dbContext.SaveChangesAsync();
-                return (totalSynced, adminCount, techCount, reqCount, $"Sinkronisasi Mailcow berhasil: {totalSynced} pengguna Mailcow terproses.");
+                return (totalSynced, adminCount, techCount, reqCount, $"Sinkronisasi Mailcow berhasil: {totalSynced} pengguna (Siswa, Guru, TU, Admin) terproses.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Gagal sinkronisasi pengguna Mailcow.");
                 return (0, 0, 0, 0, $"Error sinkronisasi Mailcow API: {ex.Message}");
             }
+        }
+
+        private async Task<MailcowBox?> GetMailboxFromApiAsync(string email)
+        {
+            string apiUrl = _config["Mailcow:ApiUrl"] ?? "https://mail.smk.baktinusantara666.sch.id";
+            string apiKey = _config["Mailcow:ApiKey"] ?? "925B68-0FF6BB-36B760-F6C051-AAF343";
+
+            if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+            try
+            {
+                using var handler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
+                };
+                using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(6) };
+
+                // 1. Direct query: GET /api/v1/get/mailbox/{email}
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{apiUrl.TrimEnd('/')}/api/v1/get/mailbox/{Uri.EscapeDataString(email)}");
+                request.Headers.Add("X-API-Key", apiKey);
+
+                var response = await client.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonString = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(jsonString);
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        var box = ParseMailbox(doc.RootElement);
+                        if (box != null && !string.IsNullOrWhiteSpace(box.Email)) return box;
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var elem in doc.RootElement.EnumerateArray())
+                        {
+                            var box = ParseMailbox(elem);
+                            if (box != null && !string.IsNullOrWhiteSpace(box.Email)) return box;
+                        }
+                    }
+                }
+
+                // 2. Query all mailboxes if single lookup is not supported
+                var allReq = new HttpRequestMessage(HttpMethod.Get, $"{apiUrl.TrimEnd('/')}/api/v1/get/mailbox/all");
+                allReq.Headers.Add("X-API-Key", apiKey);
+                var allResp = await client.SendAsync(allReq);
+                if (allResp.IsSuccessStatusCode)
+                {
+                    var allJson = await allResp.Content.ReadAsStringAsync();
+                    using var allDoc = JsonDocument.Parse(allJson);
+                    if (allDoc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var prop in allDoc.RootElement.EnumerateObject())
+                        {
+                            var box = ParseMailbox(prop.Value);
+                            if (box != null && box.Email.Equals(email, StringComparison.OrdinalIgnoreCase)) return box;
+                        }
+                    }
+                    else if (allDoc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var elem in allDoc.RootElement.EnumerateArray())
+                        {
+                            var box = ParseMailbox(elem);
+                            if (box != null && box.Email.Equals(email, StringComparison.OrdinalIgnoreCase)) return box;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Gagal mengambil data mailbox API dari Mailcow untuk {Email}", email);
+            }
+
+            return null;
         }
 
         private MailcowBox? ParseMailbox(JsonElement elem)

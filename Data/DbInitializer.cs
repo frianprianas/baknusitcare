@@ -127,7 +127,20 @@ namespace BaknusITCare.Data
                     CreatedAt = DateTime.UtcNow
                 };
 
-                await context.Users.AddRangeAsync(adminUser, technicianUser, sampleTeacher, sampleTuStaff);
+                var sampleStudent = new ApplicationUser
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    UserName = "siswa.pplg@smk.baktinusantara666.sch.id",
+                    Email = "siswa.pplg@smk.baktinusantara666.sch.id",
+                    FullName = "Rizky Pratama (Siswa PPLG)",
+                    RoleName = "Pelapor",
+                    DepartmentOrClass = "Siswa",
+                    PhoneNumber = "085811223344",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await context.Users.AddRangeAsync(adminUser, technicianUser, sampleTeacher, sampleTuStaff, sampleStudent);
                 await context.SaveChangesAsync();
             }
 

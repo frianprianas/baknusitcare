@@ -14,16 +14,27 @@
                         <i class="bi bi-shield-lock-fill fs-1"></i>
                     </div>
                     <h3 class="fw-bold text-dark mb-1">BaknusITCare</h3>
-                    <p class="text-secondary small">Layanan IT Terpadu SMK Bakti Nusantara 666</p>
-                    <span class="badge bg-info text-dark px-3 py-2 rounded-pill">
-                        <i class="bi bi-envelope-check me-1"></i> Autentikasi Kredensial Mailcow
-                    </span>
+                    <p class="text-secondary small mb-2">Layanan IT Terpadu SMK Bakti Nusantara 666</p>
+                    <div class="d-flex flex-wrap justify-content-center gap-1">
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 rounded-pill small">
+                            <i class="bi bi-tag-fill me-1"></i>TAG: Siswa
+                        </span>
+                        <span class="badge bg-success bg-opacity-10 text-success border px-2 py-1 rounded-pill small">
+                            <i class="bi bi-tag-fill me-1"></i>TAG: Guru
+                        </span>
+                        <span class="badge bg-info bg-opacity-10 text-info border px-2 py-1 rounded-pill small">
+                            <i class="bi bi-tag-fill me-1"></i>TAG: TU
+                        </span>
+                        <span class="badge bg-danger bg-opacity-10 text-danger border px-2 py-1 rounded-pill small">
+                            <i class="bi bi-shield-fill-check me-1"></i>TAG: Admin
+                        </span>
+                    </div>
                 </div>
 
                 @if (!string.IsNullOrEmpty(ErrorMessage))
                 {
                     <div class="alert alert-danger d-flex align-items-center rounded-3 mb-4" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3 flex-shrink-0"></i>
                         <div>@ErrorMessage</div>
                     </div>
                 }
@@ -31,7 +42,7 @@
                 @if (!string.IsNullOrEmpty(SuccessMessage))
                 {
                     <div class="alert alert-success d-flex align-items-center rounded-3 mb-4" role="alert">
-                        <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+                        <i class="bi bi-check-circle-fill fs-4 me-3 flex-shrink-0"></i>
                         <div>@SuccessMessage</div>
                     </div>
                 }
@@ -61,7 +72,7 @@
                         @if (IsLoading)
                         {
                             <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <span>Memverifikasi Mailcow...</span>
+                            <span>Memverifikasi Mailcow TAG...</span>
                         }
                         else
                         {
@@ -72,16 +83,19 @@
                 </EditForm>
 
                 <div class="mt-4 pt-3 border-top text-center">
-                    <span class="text-muted small fw-semibold d-block mb-2">Quick Demo Login Shortcuts:</span>
+                    <span class="text-muted small fw-semibold d-block mb-2">Login Cepat Akun Demo (Sesuai TAG):</span>
                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                        <button class="btn btn-sm btn-outline-dark rounded-pill" @onclick='() => QuickLogin("admin@smk.baktinusantara666.sch.id", "buhun666")'>
-                            <i class="bi bi-person-badge-fill me-1 text-danger"></i> Admin IT
+                        <button class="btn btn-sm btn-outline-danger rounded-pill" @onclick='() => QuickLogin("admin@smk.baktinusantara666.sch.id", "buhun666")'>
+                            <i class="bi bi-shield-lock me-1"></i> Admin IT
                         </button>
-                        <button class="btn btn-sm btn-outline-dark rounded-pill" @onclick='() => QuickLogin("teknisi.it@smk.baktinusantara666.sch.id", "BaknusMail123!")'>
-                            <i class="bi bi-tools me-1 text-warning"></i> Teknisi IT
+                        <button class="btn btn-sm btn-outline-success rounded-pill" @onclick='() => QuickLogin("guru.pplg@smk.baktinusantara666.sch.id", "BaknusMail123!")'>
+                            <i class="bi bi-person-video3 me-1"></i> Guru
                         </button>
-                        <button class="btn btn-sm btn-outline-dark rounded-pill" @onclick='() => QuickLogin("guru.pplg@smk.baktinusantara666.sch.id", "BaknusMail123!")'>
-                            <i class="bi bi-person-video3 me-1 text-primary"></i> Guru / Pelapor
+                        <button class="btn btn-sm btn-outline-info rounded-pill" @onclick='() => QuickLogin("tu.staff@smk.baktinusantara666.sch.id", "BaknusMail123!")'>
+                            <i class="bi bi-file-earmark-person me-1"></i> Staf TU
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick='() => QuickLogin("siswa.pplg@smk.baktinusantara666.sch.id", "BaknusMail123!")'>
+                            <i class="bi bi-mortarboard me-1"></i> Siswa
                         </button>
                     </div>
                 </div>
