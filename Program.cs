@@ -61,26 +61,30 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var logger = services.GetRequiredService<ILogger<Program>>();
 
-    try
+    bool initialized = false;
+    int maxRetries = 10;
+
+    while (maxRetries > 0 && !initialized)
     {
-        var dbContext = services.GetRequiredService<ApplicationDbContext>();
-        await DbInitializer.InitializeAsync(dbContext);
-        logger.LogInformation("Database BaknusITCare berhasil diinisialisasi.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogWarning(ex, "Koneksi database utama gagal, mencoba fallback SQLite...");
         try
         {
-            var sqliteOptionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            sqliteOptionsBuilder.UseSqlite("Data Source=Data/BaknusITCare.db");
-            using var sqliteContext = new ApplicationDbContext(sqliteOptionsBuilder.Options);
-            await DbInitializer.InitializeAsync(sqliteContext);
-            logger.LogInformation("Database SQLite fallback berhasil diinisialisasi.");
+            var dbContext = services.GetRequiredService<ApplicationDbContext>();
+            await DbInitializer.InitializeAsync(dbContext);
+            logger.LogInformation("Database BaknusITCare berhasil diinisialisasi.");
+            initialized = true;
         }
-        catch (Exception sqliteEx)
+        catch (Exception ex)
         {
-            logger.LogError(sqliteEx, "Gagal menginisialisasi database fallback.");
+            maxRetries--;
+            if (maxRetries > 0)
+            {
+                logger.LogWarning("Menunggu database SQL Server siap... Sisa percobaan: {Retries}. Pesan: {Msg}", maxRetries, ex.Message);
+                await Task.Delay(5000);
+            }
+            else
+            {
+                logger.LogError(ex, "Gagal menginisialisasi database utama setelah beberapa kali percobaan.");
+            }
         }
     }
 }

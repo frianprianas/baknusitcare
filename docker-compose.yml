@@ -13,12 +13,6 @@ services:
       - "14333:1433"
     volumes:
       - mssql_data_itcare:/var/opt/mssql/data
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'BaknusSuperPassword123!' -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
 
   web:
     build:
@@ -42,8 +36,7 @@ services:
       - Mailcow__SmtpPassword=buhun666
       - Mailcow__SenderName=BaknusITCare - Layanan IT Sekolah
     depends_on:
-      db:
-        condition: service_healthy
+      - db
 
 volumes:
   mssql_data_itcare:
