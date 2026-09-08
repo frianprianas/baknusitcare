@@ -122,15 +122,18 @@ namespace BaknusITCare.Services
                 string role = "Pelapor";
                 string primaryTag = "Pelapor";
 
+                // Check if user was appointed as Tim IT (Teknisi) by Admin
+                bool isAppointedTimIT = existingUser != null && existingUser.RoleName == "Teknisi";
+
                 if (hasAdminTag || isMasterAdmin)
                 {
                     role = "Admin";
                     primaryTag = "Admin";
                 }
-                else if (hasTeknisiTag)
+                else if (hasTeknisiTag || isAppointedTimIT)
                 {
                     role = "Teknisi";
-                    primaryTag = "Teknisi";
+                    primaryTag = hasGuruTag ? "Guru" : (hasTuTag ? "TU" : "Teknisi");
                 }
                 else if (hasGuruTag)
                 {
@@ -295,7 +298,10 @@ namespace BaknusITCare.Services
                     else
                     {
                         user.FullName = string.IsNullOrWhiteSpace(box.Name) ? user.FullName : box.Name;
-                        user.RoleName = targetRole;
+                        if (user.RoleName != "Teknisi" || isAdmin)
+                        {
+                            user.RoleName = targetRole;
+                        }
                         user.DepartmentOrClass = tagsString;
                     }
 

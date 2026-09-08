@@ -1,11 +1,12 @@
 @page "/admin/users"
 @using BaknusITCare.Data
+@using Microsoft.EntityFrameworkCore
 @inject IMailcowAuthService MailcowAuth
 @inject ApplicationDbContext DbContext
 @inject UserSessionService UserSession
 @inject NavigationManager Navigation
 
-<PageTitle>Mailcow Sync Hub - BaknusITCare</PageTitle>
+<PageTitle>Kelola Tim IT & Pengguna Mailcow - BaknusITCare</PageTitle>
 
 @if (!UserSession.IsAdmin)
 {
@@ -20,20 +21,24 @@ else
 {
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
-            <h3 class="fw-bold text-dark mb-1"><i class="bi bi-arrow-repeat text-primary me-2"></i>Mailcow User Sync Hub</h3>
-            <p class="text-secondary small mb-0">Sinkronisasi akun & penetapan peran (Admin, Teknisi, Pelapor) langsung dari Mailcow API Server</p>
+            <h3 class="fw-bold text-dark mb-1">
+                <i class="bi bi-people-fill text-primary me-2"></i>Kelola Tim IT & Pengguna Mailcow
+            </h3>
+            <p class="text-secondary small mb-0">
+                Pilih dan tetapkan staf <strong>Guru</strong> atau <strong>TU</strong> sebagai <strong>Anggota Tim IT (Teknisi)</strong> untuk menangani dan menyelesaikan tiket laporan kendala IT.
+            </p>
         </div>
         <div>
             <button class="btn btn-primary fw-bold rounded-pill px-4 shadow-sm" @onclick="TriggerMailcowSync" disabled="@IsSyncing">
                 @if (IsSyncing)
                 {
                     <span class="spinner-border spinner-border-sm me-2"></span>
-                    <span>Menghubungi Mailcow API...</span>
+                    <span>Mengambil Data Mailcow...</span>
                 }
                 else
                 {
-                    <i class="bi bi-cloud-download-fill me-2"></i>
-                    <span>Sinkronkan Sekarang</span>
+                    <i class="bi bi-cloud-arrow-down-fill me-2"></i>
+                    <span>Tarik Data dari Mailcow API</span>
                 }
             </button>
         </div>
@@ -41,113 +46,363 @@ else
 
     @if (!string.IsNullOrEmpty(SyncResultMessage))
     {
-        <div class="alert alert-success d-flex align-items-center rounded-3 mb-4 shadow-sm">
-            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+        <div class="alert alert-success d-flex align-items-center rounded-3 mb-4 shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill fs-4 me-3 flex-shrink-0"></i>
             <div>@SyncResultMessage</div>
         </div>
     }
 
-    <!-- Mailcow Status Cards -->
+    <!-- Summary KPI Cards -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="fluent-card p-3 text-center border-start border-4 border-primary">
-                <small class="text-muted text-uppercase fw-bold">Total Pengguna</small>
-                <div class="display-6 fw-bold text-dark mt-1">@UsersList.Count</div>
-                <small class="text-secondary"><i class="bi bi-people me-1"></i>Mailcow Database</small>
+            <div class="fluent-card p-3 text-center border-start border-4 border-warning bg-white">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Tim IT Terpilih</small>
+                <div class="display-6 fw-bold text-warning mt-1">@AppointedTimITCount</div>
+                <small class="text-warning fw-semibold"><i class="bi bi-tools me-1"></i>Teknisi Resolver</small>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="fluent-card p-3 text-center border-start border-4 border-danger">
-                <small class="text-muted text-uppercase fw-bold">Admin IT</small>
-                <div class="display-6 fw-bold text-danger mt-1">@UsersList.Count(u => u.RoleName == "Admin")</div>
-                <small class="text-danger"><i class="bi bi-shield-check me-1"></i>Pengelola Utama</small>
+            <div class="fluent-card p-3 text-center border-start border-4 border-success bg-white">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Staf Guru (TAG: Guru)</small>
+                <div class="display-6 fw-bold text-success mt-1">@GuruCount</div>
+                <small class="text-success fw-semibold"><i class="bi bi-person-video3 me-1"></i>Tenaga Pengajar</small>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="fluent-card p-3 text-center border-start border-4 border-warning">
-                <small class="text-muted text-uppercase fw-bold">Teknisi IT</small>
-                <div class="display-6 fw-bold text-warning mt-1">@UsersList.Count(u => u.RoleName == "Teknisi")</div>
-                <small class="text-warning"><i class="bi bi-tools me-1"></i>Petugas Resolver</small>
+            <div class="fluent-card p-3 text-center border-start border-4 border-info bg-white">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Staf TU (TAG: TU)</small>
+                <div class="display-6 fw-bold text-info mt-1">@TuCount</div>
+                <small class="text-info fw-semibold"><i class="bi bi-file-earmark-person me-1"></i>Tata Usaha</small>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="fluent-card p-3 text-center border-start border-4 border-success">
-                <small class="text-muted text-uppercase fw-bold">Pelapor / User</small>
-                <div class="display-6 fw-bold text-success mt-1">@UsersList.Count(u => u.RoleName == "Pelapor")</div>
-                <small class="text-success"><i class="bi bi-person me-1"></i>Guru, TU, Siswa</small>
+            <div class="fluent-card p-3 text-center border-start border-4 border-danger bg-white">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Admin IT</small>
+                <div class="display-6 fw-bold text-danger mt-1">@AdminCount</div>
+                <small class="text-danger fw-semibold"><i class="bi bi-shield-check me-1"></i>Administrator</small>
             </div>
         </div>
     </div>
 
-    <!-- Users Table -->
-    <div class="fluent-card p-0 overflow-hidden">
-        <div class="p-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-person-lines-fill me-2"></i>Daftar Pengguna Terdaftar</h6>
-            <span class="badge bg-secondary">Mailcow Domain: smk.baktinusantara666.sch.id</span>
+    <!-- Active Designated Tim IT Card -->
+    <div class="fluent-card p-4 bg-white mb-4 border-0 shadow-sm">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <div class="p-2 bg-warning bg-opacity-10 text-warning rounded-circle">
+                    <i class="bi bi-shield-shaded fs-4"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">Anggota Tim IT Terpilih Saat Ini (@AppointedTimITCount Orang)</h5>
+                    <small class="text-muted">Staf Guru & TU yang bertugas memproses tiket keluhan IT hingga selesai</small>
+                </div>
+            </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light text-muted small text-uppercase">
-                    <tr>
-                        <th class="ps-4">Nama Lengkap</th>
-                        <th>Email Mailcow</th>
-                        <th>Peran (Role)</th>
-                        <th>Tag / Departemen</th>
-                        <th>Login Terakhir</th>
-                        <th class="pe-4 text-end">Ubah Peran</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var user in UsersList)
-                    {
+        @if (!AppointedTimITList.Any())
+        {
+            <div class="alert alert-warning d-flex align-items-center rounded-3 mb-0">
+                <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning"></i>
+                <div>
+                    <strong>Belum ada Tim IT yang dipilih dari Guru / TU!</strong> Silakan pilih dan klik tombol <em>"+ Jadikan Tim IT"</em> pada tabel di bawah agar staf yang dipilih dapat memproses dan menyelesaikan laporan keluhan.
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var officer in AppointedTimITList)
+                {
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="p-2 bg-warning bg-opacity-25 text-dark rounded-circle fs-4">
+                                    <i class="bi bi-tools"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 180px;">@officer.FullName</div>
+                                    <div class="small text-muted text-truncate" style="max-width: 180px;">@officer.Email</div>
+                                    <span class="badge bg-warning text-dark mt-1" style="font-size: 0.7rem;">
+                                        <i class="bi bi-tag-fill me-1"></i>@officer.DepartmentOrClass
+                                    </span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Hapus dari Tim IT" @onclick="() => ToggleTimIT(officer, false)">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-pills mb-3 gap-2">
+        <li class="nav-item">
+            <button class="nav-link @(ActiveTab == "tim-it" ? "active fw-bold" : "bg-white")" @onclick='() => ActiveTab = "tim-it"'>
+                <i class="bi bi-funnel-fill me-1"></i>Pilih Tim IT dari Guru & TU (@(GuruCount + TuCount))
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(ActiveTab == "all" ? "active fw-bold" : "bg-white")" @onclick='() => ActiveTab = "all"'>
+                <i class="bi bi-people me-1"></i>Seluruh Pengguna Mailcow (@UsersList.Count)
+            </button>
+        </li>
+    </ul>
+
+    @if (ActiveTab == "tim-it")
+    {
+        <!-- Guru & TU Table for IT Team Assignment -->
+        <div class="fluent-card p-0 overflow-hidden bg-white shadow-sm mb-4">
+            <div class="p-3 bg-light border-bottom d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold text-dark small me-2"><i class="bi bi-filter me-1"></i>Filter TAG:</span>
+                    <button class="btn btn-sm @(TagFilter == "all" ? "btn-dark" : "btn-outline-secondary") rounded-pill px-3" @onclick='() => TagFilter = "all"'>
+                        Semua (@(GuruCount + TuCount))
+                    </button>
+                    <button class="btn btn-sm @(TagFilter == "guru" ? "btn-success" : "btn-outline-success") rounded-pill px-3" @onclick='() => TagFilter = "guru"'>
+                        <i class="bi bi-tag-fill me-1"></i>TAG: Guru (@GuruCount)
+                    </button>
+                    <button class="btn btn-sm @(TagFilter == "tu" ? "btn-info text-dark" : "btn-outline-info text-dark") rounded-pill px-3" @onclick='() => TagFilter = "tu"'>
+                        <i class="bi bi-tag-fill me-1"></i>TAG: TU (@TuCount)
+                    </button>
+                    <button class="btn btn-sm @(TagFilter == "appointed" ? "btn-warning text-dark" : "btn-outline-warning text-dark") rounded-pill px-3" @onclick='() => TagFilter = "appointed"'>
+                        <i class="bi bi-check-circle me-1"></i>Sudah Jadi Tim IT (@AppointedTimITCount)
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm" style="max-width: 250px;">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control border-start-0" placeholder="Cari nama / email..." @bind="SearchKeyword" @bind:event="oninput" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-muted small text-uppercase">
                         <tr>
-                            <td class="ps-4">
-                                <div class="fw-bold text-dark">@user.FullName</div>
-                                <div class="small text-muted">ID: @user.Id.Substring(0, 8)...</div>
-                            </td>
-                            <td>
-                                <span class="fw-semibold text-primary">@user.Email</span>
-                            </td>
-                            <td>
-                                @if (user.RoleName == "Admin")
-                                {
-                                    <span class="badge bg-danger text-white"><i class="bi bi-shield-fill me-1"></i>Admin</span>
-                                }
-                                else if (user.RoleName == "Teknisi")
-                                {
-                                    <span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i>Teknisi IT</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-light text-dark border"><i class="bi bi-person me-1"></i>Pelapor</span>
-                                }
-                            </td>
-                            <td>
-                                <span class="badge bg-info text-dark">@(string.IsNullOrEmpty(user.DepartmentOrClass) ? "Guru, TU" : user.DepartmentOrClass)</span>
-                            </td>
-                            <td>
-                                <span class="small text-muted">@(user.LastLoginAt?.ToString("dd MMM HH:mm") ?? "Belum Pernah")</span>
-                            </td>
-                            <td class="pe-4 text-end">
-                                <select class="form-select form-select-sm d-inline-block w-auto" @onchange="(e) => UpdateUserRole(user, e.Value?.ToString())">
-                                    <option value="Pelapor" selected="@(user.RoleName == "Pelapor")">Pelapor</option>
-                                    <option value="Teknisi" selected="@(user.RoleName == "Teknisi")">Teknisi IT</option>
-                                    <option value="Admin" selected="@(user.RoleName == "Admin")">Admin</option>
-                                </select>
-                            </td>
+                            <th class="ps-4">Nama Lengkap Guru / TU</th>
+                            <th>Email Mailcow</th>
+                            <th>TAG Mailcow</th>
+                            <th>Status Penugasan IT</th>
+                            <th class="pe-4 text-end">Aksi Penunjukan Tim IT</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @if (!FilteredGuruTuList.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-search fs-3 d-block mb-2 text-secondary"></i>
+                                    Tidak ada data Guru atau TU yang sesuai filter pencarian.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var user in FilteredGuruTuList)
+                        {
+                            bool isTimIT = user.RoleName == "Teknisi";
+                            bool isGuru = user.DepartmentOrClass?.Contains("Guru", StringComparison.OrdinalIgnoreCase) == true;
+                            bool isTu = user.DepartmentOrClass?.Contains("TU", StringComparison.OrdinalIgnoreCase) == true;
+
+                            <tr class="@(isTimIT ? "table-warning bg-opacity-25" : "")">
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="avatar-circle @(isGuru ? "bg-success" : "bg-info") text-white fw-bold">
+                                            @(string.IsNullOrEmpty(user.FullName) ? "?" : user.FullName.Substring(0, 1).ToUpper())
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">@user.FullName</div>
+                                            <small class="text-muted">ID: @user.Id.Substring(0, 8)...</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-primary font-monospace small">@user.Email</span>
+                                </td>
+                                <td>
+                                    @if (isGuru)
+                                    {
+                                        <span class="badge bg-success bg-opacity-10 text-success border px-2 py-1 rounded-pill">
+                                            <i class="bi bi-person-video3 me-1"></i>TAG: Guru
+                                        </span>
+                                    }
+                                    else if (isTu)
+                                    {
+                                        <span class="badge bg-info bg-opacity-10 text-info border px-2 py-1 rounded-pill">
+                                            <i class="bi bi-file-earmark-person me-1"></i>TAG: TU
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border px-2 py-1 rounded-pill">
+                                            @user.DepartmentOrClass
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (isTimIT)
+                                    {
+                                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 rounded-pill shadow-sm">
+                                            <i class="bi bi-tools me-1"></i>ANGGOTA TIM IT (Teknisi)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-muted border px-3 py-2 rounded-pill">
+                                            <i class="bi bi-person me-1"></i>Bukan Tim IT (Pelapor)
+                                        </span>
+                                    }
+                                </td>
+                                <td class="pe-4 text-end">
+                                    @if (isTimIT)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold" @onclick="() => ToggleTimIT(user, false)">
+                                            <i class="bi bi-person-x me-1"></i>Batalkan Tim IT
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-warning text-dark btn-sm rounded-pill px-3 fw-bold shadow-sm" @onclick="() => ToggleTimIT(user, true)">
+                                            <i class="bi bi-person-check-fill me-1"></i>+ Jadikan Tim IT
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <!-- Full Users Table (Admin, Teknisi, Guru, TU, Siswa) -->
+        <div class="fluent-card p-0 overflow-hidden bg-white shadow-sm mb-4">
+            <div class="p-3 bg-light border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-person-lines-fill me-2"></i>Seluruh Pengguna Terdaftar di Database</h6>
+                <span class="badge bg-secondary">Mailcow Server</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-muted small text-uppercase">
+                        <tr>
+                            <th class="ps-4">Nama Lengkap</th>
+                            <th>Email Mailcow</th>
+                            <th>Peran (Role)</th>
+                            <th>Tag / Departemen</th>
+                            <th>Login Terakhir</th>
+                            <th class="pe-4 text-end">Ubah Peran Manual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in UsersList)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">@user.FullName</div>
+                                    <div class="small text-muted">ID: @user.Id.Substring(0, 8)...</div>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-primary font-monospace small">@user.Email</span>
+                                </td>
+                                <td>
+                                    @if (user.RoleName == "Admin")
+                                    {
+                                        <span class="badge bg-danger text-white"><i class="bi bi-shield-fill me-1"></i>Admin</span>
+                                    }
+                                    else if (user.RoleName == "Teknisi")
+                                    {
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i>Tim IT (Teknisi)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border"><i class="bi bi-person me-1"></i>Pelapor</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge bg-info text-dark">@(string.IsNullOrEmpty(user.DepartmentOrClass) ? "-" : user.DepartmentOrClass)</span>
+                                </td>
+                                <td>
+                                    <span class="small text-muted">@(user.LastLoginAt?.ToString("dd MMM HH:mm") ?? "Belum Pernah")</span>
+                                </td>
+                                <td class="pe-4 text-end">
+                                    <select class="form-select form-select-sm d-inline-block w-auto" @onchange="(e) => UpdateUserRole(user, e.Value?.ToString())">
+                                        <option value="Pelapor" selected="@(user.RoleName == "Pelapor")">Pelapor</option>
+                                        <option value="Teknisi" selected="@(user.RoleName == "Teknisi")">Tim IT (Teknisi)</option>
+                                        <option value="Admin" selected="@(user.RoleName == "Admin")">Admin</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
 }
+
+<style>
+    .avatar-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+</style>
 
 @code {
     private List<ApplicationUser> UsersList = new();
     private bool IsSyncing = false;
     private string? SyncResultMessage;
+    private string ActiveTab = "tim-it";
+    private string SearchKeyword = "";
+    private string TagFilter = "all";
+
+    private int AppointedTimITCount => UsersList.Count(u => u.RoleName == "Teknisi");
+    private int GuruCount => UsersList.Count(u => u.DepartmentOrClass?.Contains("Guru", StringComparison.OrdinalIgnoreCase) == true);
+    private int TuCount => UsersList.Count(u => u.DepartmentOrClass?.Contains("TU", StringComparison.OrdinalIgnoreCase) == true);
+    private int AdminCount => UsersList.Count(u => u.RoleName == "Admin");
+
+    private IEnumerable<ApplicationUser> AppointedTimITList => UsersList.Where(u => u.RoleName == "Teknisi").OrderBy(u => u.FullName);
+
+    private IEnumerable<ApplicationUser> FilteredGuruTuList
+    {
+        get
+        {
+            var list = UsersList.Where(u => 
+                u.RoleName != "Admin" &&
+                (u.DepartmentOrClass?.Contains("Guru", StringComparison.OrdinalIgnoreCase) == true ||
+                 u.DepartmentOrClass?.Contains("TU", StringComparison.OrdinalIgnoreCase) == true)
+            );
+
+            if (!string.IsNullOrWhiteSpace(SearchKeyword))
+            {
+                string kw = SearchKeyword.Trim().ToLower();
+                list = list.Where(u => u.FullName.ToLower().Contains(kw) || u.Email.ToLower().Contains(kw));
+            }
+
+            if (TagFilter == "guru")
+            {
+                list = list.Where(u => u.DepartmentOrClass?.Contains("Guru", StringComparison.OrdinalIgnoreCase) == true);
+            }
+            else if (TagFilter == "tu")
+            {
+                list = list.Where(u => u.DepartmentOrClass?.Contains("TU", StringComparison.OrdinalIgnoreCase) == true);
+            }
+            else if (TagFilter == "appointed")
+            {
+                list = list.Where(u => u.RoleName == "Teknisi");
+            }
+
+            return list.OrderByDescending(u => u.RoleName == "Teknisi").ThenBy(u => u.FullName);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,6 +424,18 @@ else
         IsSyncing = false;
         SyncResultMessage = res.Message;
 
+        await LoadUsers();
+    }
+
+    private async Task ToggleTimIT(ApplicationUser user, bool makeTimIT)
+    {
+        user.RoleName = makeTimIT ? "Teknisi" : "Pelapor";
+        await DbContext.SaveChangesAsync();
+        
+        SyncResultMessage = makeTimIT 
+            ? $"Berhasil! {user.FullName} telah ditunjuk sebagai Anggota Tim IT (Teknisi). Sekarang ia dapat melihat semua laporan, memperbarui status tiket, dan menyelesaikan kendala."
+            : $"{user.FullName} telah dihapus dari Tim IT dan kembali menjadi Pelapor.";
+        
         await LoadUsers();
     }
 

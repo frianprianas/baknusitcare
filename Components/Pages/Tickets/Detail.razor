@@ -287,9 +287,9 @@ else if (CurrentTicket != null)
                         <option value="">-- Pilih User Mailcow yang Ditugaskan --</option>
                         @foreach (var user in MailcowOfficersList)
                         {
-                            string tagLabel = user.DepartmentOrClass ?? user.RoleName;
+                            string prefix = user.RoleName == "Teknisi" ? "⭐ [TIM IT] " : (user.RoleName == "Admin" ? "🛡️ [ADMIN] " : $"[{user.DepartmentOrClass}] ");
                             <option value="@user.Id">
-                                [@tagLabel] @user.FullName - (@user.Email)
+                                @prefix @user.FullName - (@user.Email)
                             </option>
                         }
                     </select>
@@ -333,7 +333,9 @@ else if (CurrentTicket != null)
         
         // Load all Mailcow users (Guru, TU, Teknisi, Admin) available for ticket follow-up assignment
         MailcowOfficersList = await DbContext.Users
-            .OrderBy(u => u.RoleName)
+            .Where(u => u.RoleName == "Teknisi" || u.RoleName == "Admin" || 
+                        (u.DepartmentOrClass != null && (u.DepartmentOrClass.Contains("Guru") || u.DepartmentOrClass.Contains("TU"))))
+            .OrderByDescending(u => u.RoleName == "Teknisi")
             .ThenBy(u => u.FullName)
             .ToListAsync();
     }
